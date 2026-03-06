@@ -1,0 +1,119 @@
+/*
+ * Copyright (c) 2026, Ali Abdallah <ali.abdallah@suse.com>
+ *
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ * The views and conclusions contained in the software and documentation are those
+ * of the authors and should not be interpreted as representing official policies,
+ * either expressed or implied, of the FreeBSD Project.
+ */
+
+#ifndef __MBOX__H_
+#define __MBOX__H_
+
+#include <stdint.h>
+#include <stdbool.h>
+#include <unistd.h>
+
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <sys/queue.h>
+
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
+
+enum {
+    MBOX_INIT_CONNECT = 0,
+    MBOX_RETRY_CONNECT,
+    MBOX_GET_SRV_CAPS,
+    MBOX_CHECK_SRV_CAPS,
+    MBOX_CONNECT_STARTTLS,
+    MBOX_CONNECT_TLS,
+    MBOX_TLS_HANDSHAKE,
+    MBOX_TLS_GET_SRV_CAPS,
+    MBOX_TLS_LOGIN,
+    MBOX_STARTTLS_HANDSHAKE,
+    MBOX_STARTTLS_CHECK_LOGIN,
+    MBOX_SELECT,
+    MBOX_CHECK_SELECT,
+    MBOX_SEND_IDLE,
+    MBOX_CHECK_IDLE,
+    MBOX_CHECK_DONE,
+    MBOX_IDLE,
+    MBOX_DISABLED,
+    MBOX_INVALID
+};
+
+enum {
+    TLS_TYPE_INVALID = 0,
+    TLS_TYPE_NONE,
+    TLS_TYPE_STARTTLS,
+    TLS_TYPE_SSL
+};
+
+struct mbox {
+    /* Loaded from configuration */
+    char     *name;
+    char     *hostname;
+    char     *username;
+    char     *password;
+    char     *pass_cmd;
+    char     *sync_cmd;       /* Command to run on new emails */
+    char    **sync_args;
+    uint32_t  idle_timeout;
+    uint16_t  port;
+    uint8_t   tls_type;
+    /* End of loaded from conf fields */
+    int       sock;
+    char     *buf;
+    size_t    buf_size;
+    size_t    buf_len;
+    int       state;
+    int       old_state;       /* Save old state to check if we are stuck */
+    uint32_t  state_timeout;   /* Single state timeout, not applicable to MBOX_IDLE */
+    pid_t     sync_pid;        /* pid of the sync command */
+    uint32_t  re_idle_in;      /* DONE -> IDLE Sequence in ms time */
+    uint32_t  delay;           /* Delay in ms to re-connect or to next action */
+    uint32_t  caps;
+    uint32_t  tag;
+    struct sockaddr_in servaddr;
+    SSL      *ssl;
+    BIO      *bio;
+    TAILQ_ENTRY(mbox) mboxes;
+};
+
+#define CAPS_IDLE       (1 << 0)
+#define CAPS_STARTTLS   (1 << 2)
+#define CAPS_AUTH_PLAIN (1 << 3)
+#define CAPS_READY      (1 << 4)
+
+typedef void (*mbox_conn) (struct mbox *mbox);
+
+bool conf_init();
+void mbox_foreach(mbox_conn func);
+void mbox_run_sync(struct mbox *m);
+void mbox_free_conn(struct mbox *m);
+void mbox_free(struct mbox *m);
+
+#endif /* __MBOX_H__ */
