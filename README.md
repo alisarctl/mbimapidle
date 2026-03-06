@@ -1,34 +1,49 @@
 # Introduction
 
-mbimapidle maintains persistent server connection using IMAP protocol 
+**mbimapidle** maintains persistent server connection using IMAP protocol 
 (RFC 2177) IDLE extension, it can be configured to run email sync command
 when it receives notification from the imap server about new messages.
 
 # Requirements & Installation
 
-mbimapidle requires openssl version 3 and above, it comes with a simple BSD
-style makefile (on Linux often you just have to install bmake).
+**mbimapidle** requires **openssl** version 3 and above, it comes with a simple BSD
+style makefile (on Linux® often you just have to install bmake).
+
+1. BSD make
+2. openssl-3
 
 ## BSD
 ```
-make
-make install PREFIX=/usr/local
+$ make
+# make install PREFIX=/usr/local
 ```
 
-## Linux
+## Linux (openrc) 
 ```
 $ bmake
-# bmake install PREFIX=/usr
+# bmake install PREFIX=/usr RC=openrc
 ```
+
+## Linux (systemd)
+```
+$ bmake
+# bmake install PREFIX=/usr RC=systemd
+```
+
+
 
 # Configuration file
 Configuration file is located at
 
+```
 $XDG_CONFIG_HOME/mbimapidle/mbimapidlerc
+```
 
 which is normally located at 
 
+```
 ~/.config/mbimapidle/mbimapidlerc
+```
 
 example
 
@@ -42,8 +57,8 @@ password  =  "pass1" # Comment
 username = "user1"
 sync_cmd = "/usr/bin/mbsync -a"
 idle_timeout = "10"
-tls_type="ssl"
 port = "993"
+tls_type="ssl"
 
 [mbox2]
 hostname = "hostname2"
@@ -51,6 +66,7 @@ password  =  "pass2"
 username = "user2"
 sync_cmd = "/usr/bin/mbsync -a"
 port = "143"
+tls_type = "starttls"
 ```
 
 # User service file
@@ -67,8 +83,10 @@ command="/usr/bin/mbimapidle"
 supervisor=supervise-daemon
 ```
 
+```
 $ rc-update -U add mbimapidle
 $ rc-service -U mbimapidle start
+```
 
 ## systemd
 TODO
