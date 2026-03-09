@@ -290,10 +290,13 @@ static bool validate_block_config(struct mbox *m, char *key, char *val) {
         val = trim(val);
         if (!strncmp(val, "none", 4)) {
             m->tls_type = TLS_TYPE_NONE;
+            return true;
         } else if (!strncmp(val, "starttls", 8)) {
             m->tls_type = TLS_TYPE_STARTTLS;
+            return true;
         } else if (!strncmp(val, "ssl", 3)) {
             m->tls_type = TLS_TYPE_SSL;
+            return true;
         } else {
             mlog(LOG_ERR, "'%s' invalid ssl type '%s'\n", m->name, val);
             return false;
