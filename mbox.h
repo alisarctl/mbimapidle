@@ -84,6 +84,7 @@ struct mbox {
     uint32_t  idle_timeout;
     uint16_t  port;
     uint8_t   tls_type;
+    bool      check_cert;
     /* End of loaded from conf fields */
     int       sock;
     char     *buf;

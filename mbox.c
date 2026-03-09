@@ -259,6 +259,22 @@ static bool validate_block_config(struct mbox *m, char *key, char *val) {
         return true;
     }
 
+    if (!strncmp(key, "check_certificate", 17)) {
+        val = trim(val);
+        if (!strncmp(val, "false", 5) || !strncmp(val, "no", 2)) {
+            m->check_cert = false;
+            return true;
+        }
+        else if (!strncmp(val, "true", 4) || !strncmp(val, "yes", 3)) {
+            m->check_cert = true;
+            return true;
+        }
+        else {
+            mlog(LOG_ERR, "'%s' Unexpected value '%s' for check_certificate key\n", m->name, val);
+            return false;
+        }
+    }
+
     if (!strncmp(key, "pass_cmd", 8)) {
         m->pass_cmd = strdup(val);
         return true;

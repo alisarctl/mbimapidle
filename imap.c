@@ -421,6 +421,11 @@ static void mbox_tls_login(struct mbox *m) {
     free(msg);
 }
 
+static int mbox_skip_cert_validation(int unused, X509_STORE_CTX *ctx) {
+    (void)unused;
+    (void)ctx;
+    return 1;
+}
 
 static int tls_handshake(struct mbox *m) {
     int ret = 0;
@@ -438,9 +443,15 @@ static int tls_handshake(struct mbox *m) {
         goto end;
     }
 
-    if (!SSL_set1_host(m->ssl, m->hostname)) {
-        mlog(LOG_ERR, "'%s' Failed to set the certificate verification hostname\n", m->name);
-        goto end;
+    if (m->check_cert) {
+        mlog(LOG_DEBUG, "'%s' Setting hostname %s for certificate validation\n", m->name, m->hostname);
+        if (!SSL_set1_host(m->ssl, m->hostname)) {
+            mlog(LOG_ERR, "'%s' Failed to set the certificate verification hostname\n", m->name);
+            goto end;
+        }
+    } else {
+        SSL_set_verify(m->ssl, SSL_VERIFY_PEER, mbox_skip_cert_validation);
+        mlog(LOG_WARN, "'%s' Skipping certificate validation\n", m->name);
     }
 
     /* Do the handshake with the server */

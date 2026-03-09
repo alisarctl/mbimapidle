@@ -57,6 +57,7 @@ password  =  "pass1" # Comment
 username = "user1"
 sync_cmd = "/usr/bin/mbsync -a"
 idle_timeout = "10"
+check_certificate="false"
 port = "993"
 tls_type="ssl"
 
@@ -66,6 +67,7 @@ password  =  "pass2"
 username = "user2"
 sync_cmd = "/usr/bin/mbsync -a"
 port = "143"
+check_certificate="true"
 tls_type = "starttls"
 ```
 
@@ -92,13 +94,14 @@ $ rc-service -U mbimapidle start
 TODO
 
 # TODO
-* configuration to skip certificate validation
 * password command configuration
 * SIGUSR1 support to restart the process
 * oauth https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth
 * Handle sync_command not found
 * Redirect sync command output to logs
 * Buffer size
+* Plain communication
+* Detect connection up/down
 * Fix "FIXMEs"
 * man page
 * complete command line arguments
