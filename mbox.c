@@ -152,8 +152,8 @@ out:
 
 static bool check_key_value(char *line, char **key, char **val) {
     size_t key_len = 0;
-    uint64_t quote1_pos = 0;
-    uint64_t quote2_pos = 0;
+    uint32_t quote1_pos = 0;
+    uint32_t quote2_pos = 0;
     bool eq_found = false;
     bool val_found = false;
     int idx = 0;
@@ -164,15 +164,19 @@ static bool check_key_value(char *line, char **key, char **val) {
 
     do {
         if (eq_found) {
-            if (line[idx] == ' ') continue;
+            if (isspace(line[idx])) continue;
             if (quote1_pos == 0) {
-                if (line[idx] == '"')
+                if (line[idx] == '"') {
                     quote1_pos = idx;
+                    continue;
+                }
                 else
                     return false;
             }
 
             if (line[idx] == '"' && line[idx - 1] != '\\' && quote1_pos != 0) {
+                if (quote2_pos != 0)
+                    return false;
                 quote2_pos = idx;
             }
         } /* eq_found */
@@ -577,10 +581,12 @@ void mbox_free(struct mbox *m) {
    CHECK_FREE(m->ssl);
    CHECK_FREE(m->bio);
 
-   for (tmp = m->sync_args; *tmp !=NULL; tmp++) {
-       free(*tmp);
+   if (m->sync_args) {
+       for (tmp = m->sync_args; *tmp !=NULL; tmp++) {
+           free(*tmp);
+       }
+       CHECK_FREE(m->sync_args);
    }
-   CHECK_FREE(m->sync_args);
 
    if (m->sock) close(m->sock);
    free(m);
