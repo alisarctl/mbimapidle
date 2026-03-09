@@ -52,19 +52,20 @@ extern volatile int main_loop_running;
 
 static SSL_CTX *ssl_ctx = NULL;
 
-#define COUNTDOWN(_val,_reset) _val = _val == 0 ? _reset : _val <= TICK_MS ? 0 : _val - TICK_MS
-
 static inline void handle_failure(struct mbox *m) {
     uint32_t delay;
 
-    m->nfails++;
-    delay = m->nfails << 4;
-    m->delay = SEC_MS(delay);
-    m->state = MBOX_INIT_CONNECT;
     mbox_free_conn(m);
-    m->state_timeout = SEC_MS(10);
+
+    m->nfails++;
+    delay = m->nfails << 5;
 
     mlog(LOG_DEBUG,"'%s' retrying connection in %lu seconds\n", m->name, delay);
+
+    m->delay = SEC_MS(delay);
+    m->delay = (m->delay / 100) * 100;
+    m->state = MBOX_INIT_CONNECT;
+    m->state_timeout = SEC_MS(20);
 }
 
 static bool imap_check_tag(struct mbox *m) {
