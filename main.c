@@ -59,11 +59,25 @@ static struct option opts[] = {
 
 /* extern variables */
 volatile int main_loop_running = 1;
+
+/* Ignore SIGHUP for 10 seconds after the first one received */
+static int countdown_reload = SEC_MS(10);
+static volatile bool reload_all = false;
+
 int log_to_syslog = 0;
 bool debug = false;
 
 static void sig_handler(int signum) {
-    main_loop_running = 0;
+
+    if (signum == SIGHUP) {
+        if (reload_all || countdown_reload != 0) {
+            mlog(LOG_INFO, "Daemon is reloading, ignoring SIGHUP\n");
+        } else {
+            reload_all = true;
+            countdown_reload = SEC_MS(10);
+        }
+    } else
+        main_loop_running = 0;
 }
 
 static void mbox_proc(struct mbox*m) {
@@ -149,10 +163,31 @@ int main(int argc, char *argv[])
     if (sigaction(SIGTERM, &sa, NULL) == -1)
         mlog(LOG_ERR, "Failed to set SIGTERM action\n");
 
+    if (sigaction(SIGHUP, &sa, NULL) == -1)
+        mlog(LOG_ERR, "Failed to set SIGTERM action\n");
+
     ts.tv_sec = TICK_MS / 1000;
     ts.tv_nsec = (TICK_MS % 1000) * 1000000;
 
     while (main_loop_running) {
+
+        /* Reload configuration on SIGHUP */
+        COUNTDOWN(countdown_reload, 0);
+        if (reload_all) {
+
+            mbox_foreach(&mbox_shutdown_ssl);
+            mbox_remove_all();
+
+            if (!conf_init()) {
+                mlog(LOG_ERR, "Failed to load configuration\n");
+                mlog(LOG_INFO, "Please fix configuration and reload with SIGHUP\n");
+                mbox_remove_all();
+                /* Accept SIGHUP for reloading without delays */
+                countdown_reload = 0;
+            }
+            reload_all = false;
+        }
+
         /* Check mbox state */
         mbox_foreach(&mbox_check_state);
 
@@ -164,7 +199,7 @@ int main(int argc, char *argv[])
 
     mlog(LOG_INFO, "Exiting gracefully");
     mbox_foreach(&mbox_shutdown_ssl);
-    mbox_foreach(&mbox_free);
+    mbox_remove_all();
 
     return EXIT_SUCCESS;
 }

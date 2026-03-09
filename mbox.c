@@ -88,16 +88,16 @@ static bool check_sync_command(struct mbox *m, char *val)
     sub = val;
     while (!isspace(*sub++)) {cmd_len++;}
     if (val[cmd_len - 1] == '/') {
-        mlog(LOG_ERR, "'%s' invalid sync command '%s' \n", m->name, val);
+        mlog(LOG_ERR, "'%s' invalid slash terminated sync command '%s' \n", m->name, val);
         return false;
     }
 
-    path = getenv("PATH");
+    path = strdup(getenv("PATH"));
     tmp = strdup(val);
     dirn = dirname(tmp);
 
     if (strlen(dirn) > strlen(path)) {
-        mlog(LOG_ERR, "'%s' invalid sync command '%s' \n", m->name, val);
+        mlog(LOG_ERR, "'%s' invalid sync command length '%s' \n", m->name, val);
         goto out;
     }
 
@@ -110,6 +110,7 @@ static bool check_sync_command(struct mbox *m, char *val)
             break;
         }
     }
+    free(path);
 
     if (!found_in_path) {
         mlog(LOG_ERR, "'%s' sync command '%s' not found in $PATH\n",
@@ -140,6 +141,7 @@ static bool check_sync_command(struct mbox *m, char *val)
     args[idx] = NULL;
 
     m->sync_cmd = malloc(cmd_len);
+    memset(m->sync_cmd, 0, cmd_len);
     strncpy (m->sync_cmd, val, cmd_len);
     m->sync_args = args;
     ret = true;
@@ -487,7 +489,7 @@ bool conf_init() {
         num_mbox++;
         if (!check_mbox_fields(m)) {
             mlog(LOG_ERR,"Incomplete configuration for mbox '%s'\n", m->name);
-            return false;
+            goto end;
         }
         m->buf_size = 1024;
         m->buf = malloc(m->buf_size);
@@ -496,9 +498,10 @@ bool conf_init() {
 
     if (num_mbox == 0) {
         mlog(LOG_ERR,"No imap mail found in configuration\n");
-        return false;
+        goto end;
     }
 
+    fclose(config);
     return true;
 end:
     mlog(LOG_ERR, "Syntax error near '%s' line %d\n", p, linenum);
@@ -512,6 +515,15 @@ void mbox_foreach(mbox_conn func) {
     struct mbox *m;
     TAILQ_FOREACH(m, &mbox_head, mboxes) {
         (func)(m);
+    }
+}
+
+void mbox_remove_all(void) {
+    struct mbox *m;
+    struct mbox *tmp;
+    TAILQ_FOREACH_SAFE(m, &mbox_head, mboxes, tmp) {
+        TAILQ_REMOVE(&mbox_head, m, mboxes);
+        mbox_free(m);
     }
 }
 
@@ -529,7 +541,7 @@ void mbox_run_sync(struct mbox *m) {
     if (m->sync_pid == 0) {
         int ret = execvp(m->sync_cmd, m->sync_args);
         if (ret == -1) {
-            mlog(LOG_ERR, "'%s' Failed to run sync command :%s\n", m->name, strerror(errno));
+            mlog(LOG_ERR, "'%s' Failed to run sync command '%s':'%s'\n", m->name, m->sync_cmd, strerror(errno));
             exit(-1);
         }
     }

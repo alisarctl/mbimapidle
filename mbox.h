@@ -114,6 +114,7 @@ typedef void (*mbox_conn) (struct mbox *mbox);
 
 bool conf_init();
 void mbox_foreach(mbox_conn func);
+void mbox_remove_all(void);
 void mbox_run_sync(struct mbox *m);
 void mbox_free_conn(struct mbox *m);
 void mbox_free(struct mbox *m);
