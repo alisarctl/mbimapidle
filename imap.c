@@ -162,13 +162,12 @@ static void mbox_connect (struct mbox *m) {
             }
 
             if (errno == EISCONN) {
-                if (m->tls_type == TLS_TYPE_STARTTLS)
+                if (m->tls_type == TLS_TYPE_STARTTLS || m->tls_type == TLS_TYPE_NONE)
                     m->state = MBOX_GET_SRV_CAPS;
                 else if (m->tls_type == TLS_TYPE_SSL)
                     m->state = MBOX_CONNECT_TLS;
                 else
-                    /* FIXME */
-                    m->state = MBOX_DISABLED;
+                    assert_not_reached();
                 break;
             }
 
@@ -180,7 +179,7 @@ static void mbox_connect (struct mbox *m) {
     }
 }
 
-static bool mbox_read (struct mbox *m) {
+static bool mbox_read_socket (struct mbox *m, bool block) {
 
     int idx = 0;
     int rc;
@@ -192,8 +191,7 @@ static bool mbox_read (struct mbox *m) {
         rc = recv(m->sock, m->buf + idx, m->buf_size - m->buf_len, MSG_DONTWAIT);
         if (rc == -1) {
             if (errno == EAGAIN) {
-                printf("Retrying\n");
-                break;
+                if (!block) break;
             } else {
                 mlog(LOG_INFO, "%s Timeout getting server caps\n", m->name);
                 handle_failure(m);
@@ -263,7 +261,7 @@ static void check_srv_caps (struct mbox *m) {
     }
 
     if (!(m->caps & CAPS_AUTH_PLAIN)) {
-        mlog(LOG_INFO, "'%s' Server doesn't support AUTH:LOGIN, don't know how to authenticate, disabling\n", m->name);
+        mlog(LOG_INFO, "'%s' Server doesn't support AUTH:PLAIN, don't know how to authenticate, disabling\n", m->name);
         goto disable;
     }
 
@@ -276,10 +274,13 @@ static void check_srv_caps (struct mbox *m) {
         }
     } else if (m->tls_type == TLS_TYPE_SSL) {
         m->state = MBOX_TLS_LOGIN;
-    } else {
-        mlog(LOG_INFO, "'%s' FIXME: Plain communication is not yet implemented, disabling\n", m->name);
-        goto disable;
-    }
+    } else if (m->tls_type == TLS_TYPE_NONE) {
+        m->state = MBOX_LOGIN;
+        mlog(LOG_WARN,
+             "'%s' *** WARNING: Password will be sent to the server un-ecrypted ***\n",
+             m->name);
+    } else
+        assert_not_reached();
 
     return;
 out:
@@ -449,10 +450,28 @@ end:
     return false;
 }
 
+static bool mbox_write(struct mbox *m, char *msg) {
+    bool ret = false;
+    size_t written = 0;
 
-static void mbox_tls_login(struct mbox *m) {
+    while (main_loop_running) {
+        written += send(m->sock, msg + written, strlen(msg) - written, MSG_DONTWAIT);
+        if (written == -1) {
+            mlog(LOG_ERR, "'%s' Failed to send message to the server\n", m->name);
+            break;
+        }
+        if (written == strlen(msg)) {
+            ret = true;
+            break;
+        }
+    }
+    return ret;
+}
+
+static bool mbox_login(struct mbox *m) {
     char *msg;
     size_t msg_len;
+    bool ret;
 
     msg_len = strlen(m->username) + strlen(m->password) + 25;
     msg = malloc(msg_len);
@@ -460,10 +479,16 @@ static void mbox_tls_login(struct mbox *m) {
     memset(msg, 0, msg_len);
     sprintf(msg, "A%010d LOGIN \"%s\" \"%s\"\r\n", ++m->tag, m->username, m->password);
 
-    if (!mbox_write_ssl(m, msg))
-       mlog(LOG_ERR, "'%s' Failed to send login message\n", m->name);
+    if (m->tls_type == TLS_TYPE_NONE) {
+        ret = mbox_write(m, msg);
+    } else {
+        ret = mbox_write_ssl(m, msg);
+    }
 
+    if (!ret)
+        mlog(LOG_ERR, "'%s' Failed to send login message\n", m->name);
     free(msg);
+    return ret;
 }
 
 static int tls_handshake(struct mbox *m) {
@@ -524,41 +549,65 @@ end:
     return false;
 }
 
-static void mbox_select(struct mbox *m) {
+static bool mbox_read(struct mbox *m, bool block) {
+    bool ret;
+    if (m->tls_type == TLS_TYPE_NONE)
+        ret = mbox_read_socket(m, block);
+    else
+        ret = mbox_read_ssl(m, block);
+
+    return ret;
+}
+
+static bool mbox_select(struct mbox *m) {
     char msg[32];
+    bool ret;
 
     memset(msg, 0, sizeof(msg));
     sprintf(msg, "A%010d SELECT INBOX\r\n", ++m->tag);
 
-    if (!mbox_write_ssl(m, msg)) {
+    if (m->tls_type == TLS_TYPE_NONE)
+        ret = mbox_write(m, msg);
+    else
+        ret = mbox_write_ssl(m, msg);
+
+    if (!ret)
         mlog(LOG_ERR, "'%s' Failed to select INBOX \n", m->name);
-    } else {
-        m->state = MBOX_CHECK_SELECT;
-    }
+    return ret;
 }
 
-static void mbox_send_idle(struct mbox *m) {
+static bool mbox_send_idle(struct mbox *m) {
     char msg[32];
+    bool ret;
 
     memset(msg, 0, sizeof(msg));
     sprintf(msg, "A%010d IDLE\r\n", ++m->tag);
 
-    /* FIXME */
-    if (!mbox_write_ssl(m, msg))
-        mlog(LOG_ERR, "'%s' Failed to send IDLE\n", m->name);
+    if (m->tls_type == TLS_TYPE_NONE)
+        ret = mbox_write(m, msg);
     else
-        m->state = MBOX_CHECK_IDLE;
+        ret = mbox_write_ssl(m, msg);
+
+    if (!ret)
+        mlog(LOG_ERR, "'%s' Failed to send IDLE\n", m->name);
+    return ret;
 }
 
-static void mbox_send_done(struct mbox *m) {
+static bool mbox_send_done(struct mbox *m) {
     char msg[32];
+    bool ret;
 
     memset(msg, 0, sizeof(msg));
     sprintf(msg, "DONE\r\n");
 
-    /* FIXME */
-    if (!mbox_write_ssl(m, msg))
+    if (m->tls_type == TLS_TYPE_NONE)
+        ret = mbox_write(m, msg);
+    else
+        ret = mbox_write_ssl(m, msg);
+
+    if (!ret)
         mlog(LOG_ERR, "'%s' Failed to send DONE command\n", m->name);
+    return ret;
 }
 
 void mbox_idle_proc(struct mbox *m) {
@@ -577,7 +626,7 @@ void mbox_idle_proc(struct mbox *m) {
             break;
         case MBOX_GET_SRV_CAPS:
             mlog(LOG_DEBUG, "'%s' get server caps\n", m->name);
-            if (mbox_read(m)) {
+            if (mbox_read_socket(m, false)) {
                 m->state = MBOX_CHECK_SRV_CAPS;
             }
             break;
@@ -592,15 +641,15 @@ void mbox_idle_proc(struct mbox *m) {
             RESET_BUFFER(m);
             break;
         case MBOX_STARTTLS_OFFER:
-            if (mbox_read(m)) {
+            if (mbox_read_socket(m, false)) {
                 /* FIXME, check STARTTLS OFFER */
                 m->state = MBOX_STARTTLS_HANDSHAKE;
             }
             break;
         case MBOX_STARTTLS_HANDSHAKE:
              if(tls_handshake(m) > 0) {
-                 mbox_tls_login(m);
-                 m->state = MBOX_STARTTLS_CHECK_LOGIN;
+                 if (mbox_login(m))
+                     m->state = MBOX_CHECK_LOGIN;
              }
             break;
         case MBOX_CONNECT_TLS:
@@ -613,17 +662,22 @@ void mbox_idle_proc(struct mbox *m) {
             }
             break;
         case MBOX_TLS_GET_SRV_CAPS:
-            if (mbox_read_ssl(m, false)) {
+            if (mbox_read(m, false)) {
                 m->state = MBOX_CHECK_SRV_CAPS;
             }
             break;
-        case MBOX_TLS_LOGIN:
-            mbox_tls_login(m);
-            m->state = MBOX_STARTTLS_CHECK_LOGIN;
+        case MBOX_LOGIN:
+            if (mbox_login(m))
+                m->state = MBOX_CHECK_LOGIN;
             RESET_BUFFER(m);
             break;
-        case MBOX_STARTTLS_CHECK_LOGIN:
-            if (mbox_read_ssl(m, false)) {
+        case MBOX_TLS_LOGIN:
+            if (mbox_login(m))
+                m->state = MBOX_CHECK_LOGIN;
+            RESET_BUFFER(m);
+            break;
+        case MBOX_CHECK_LOGIN:
+            if (mbox_read(m, false)) {
                 if (imap_check_tag(m)) {
                     if (imap_check_login(m)) {
                         mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
@@ -639,12 +693,13 @@ void mbox_idle_proc(struct mbox *m) {
             break;
         case MBOX_SELECT:
             mlog(LOG_DEBUG, "'%s' sending select\n", m->name);
-            mbox_select(m);
+            if (mbox_select(m))
+                m->state = MBOX_CHECK_SELECT;
             RESET_BUFFER(m);
             break;
         case MBOX_CHECK_SELECT:
             mlog(LOG_DEBUG, "'%s' checking select result\n", m->name);
-            if (mbox_read_ssl(m, false)) {
+            if (mbox_read(m, false)) {
                 if (imap_check_tag(m)) {
                     if (imap_check_select(m)) {
                         m->state = MBOX_SEND_IDLE;
@@ -657,11 +712,12 @@ void mbox_idle_proc(struct mbox *m) {
             break;
         case MBOX_SEND_IDLE:
             mlog(LOG_DEBUG, "'%s' sending IDLE for server\n", m->name);
-            mbox_send_idle(m);
+            if (mbox_send_idle(m))
+                m->state = MBOX_CHECK_IDLE;
             RESET_BUFFER(m);
             break;
         case MBOX_CHECK_IDLE:
-            if (mbox_read_ssl(m, false)) {
+            if (mbox_read(m, false)) {
                 if (imap_check_idle(m)) {
                     mlog(LOG_DEBUG, "'%s' Entering IDLE state\n", m->name);
                     m->state = MBOX_IDLE;
@@ -674,7 +730,7 @@ void mbox_idle_proc(struct mbox *m) {
             }
             break;
         case MBOX_IDLE:
-            if (mbox_read_ssl(m, false)) {
+            if (mbox_read(m, false)) {
                 if (!imap_is_keep_alive(m)) {
                     mlog(LOG_DEBUG, "'%s' Running sync command\n", m->name);
                     mbox_run_sync(m);
@@ -691,7 +747,7 @@ void mbox_idle_proc(struct mbox *m) {
             }
             break;
         case MBOX_CHECK_DONE:
-            if (mbox_read_ssl(m, false)) {
+            if (mbox_read(m, false)) {
                 mlog(LOG_DEBUG, "'%s' Check response to DONE command '%s'\n", m->name, m->buf);
                 if (imap_is_idle_completed(m)) {
                     mlog(LOG_DEBUG, "'%s' IDLE completed\n", m->name);

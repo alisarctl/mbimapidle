@@ -98,4 +98,8 @@ static inline void tick_wait(void) {
     ts.tv_nsec = (TICK_MS % 1000) * 1000000;
     nanosleep(&ts, &ts);
 }
+
+
+#define assert_not_reached() { mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); exit(EXIT_FAILURE);}
+
 #endif
