@@ -54,6 +54,21 @@ static SSL_CTX *ssl_ctx = NULL;
 
 #define COUNTDOWN(_val,_reset) _val = _val == 0 ? _reset : _val <= TICK_MS ? 0 : _val - TICK_MS
 
+static bool imap_check_tag(struct mbox *m) {
+    char msg_tag[12];
+
+    memset (msg_tag, 0, sizeof(msg_tag));
+    sprintf(msg_tag, "A%010d", m->tag);
+
+    return strstr(m->buf, msg_tag) != NULL;
+}
+
+static bool imap_is_idle_completed(struct mbox *m) {
+    if (strstr("OK Idle completed", m->buf))
+        return true;
+    return false;
+}
+
 static bool imap_check_idle(struct mbox *m) {
     mlog(LOG_DEBUG, "'%s' IDLE message '%s'\n", m->name, m->buf);
 
@@ -573,12 +588,14 @@ void mbox_idle_proc(struct mbox *m) {
             break;
         case MBOX_STARTTLS_CHECK_LOGIN:
             if (mbox_read_ssl(m, false)) {
-                if (imap_check_login(m)) {
-                    mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
-                    m->state = MBOX_SELECT;
-                } else {
-                    mlog(LOG_DEBUG,"'%s' login failed, disabling\n", m->name);
-                    m->state = MBOX_DISABLED;
+                if (imap_check_tag(m)) {
+                    if (imap_check_login(m)) {
+                        mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
+                        m->state = MBOX_SELECT;
+                    } else {
+                        mlog(LOG_DEBUG,"'%s' login failed, disabling\n", m->name);
+                        m->state = MBOX_DISABLED;
+                    }
                 }
             }
             break;
@@ -589,11 +606,13 @@ void mbox_idle_proc(struct mbox *m) {
         case MBOX_CHECK_SELECT:
             mlog(LOG_DEBUG, "'%s' checking select result\n", m->name);
             if (mbox_read_ssl(m, false)) {
-                if (imap_check_select(m)) {
-                    m->state = MBOX_SEND_IDLE;
-                } else {
-                    mlog(LOG_DEBUG, "'%s' Failed to select INBOX, disabling (got %s)\n", m->name, m->buf);
-                    m->state = MBOX_DISABLED;
+                if (imap_check_tag(m)) {
+                    if (imap_check_select(m)) {
+                        m->state = MBOX_SEND_IDLE;
+                    } else {
+                        mlog(LOG_DEBUG, "'%s' Failed to select INBOX, disabling (got %s)\n", m->name, m->buf);
+                        m->state = MBOX_DISABLED;
+                    }
                 }
             }
             break;
@@ -609,11 +628,8 @@ void mbox_idle_proc(struct mbox *m) {
                     m->re_idle_in = MIN2MS(m->idle_timeout);
                     mbox_run_sync(m);
                 }
-                else {
-                    mlog(LOG_ERR, "'%s' imap idle failed '%s'\n", m->name, m->buf);
-                    mlog(LOG_ERR, "'%s' disabled due to the above error\n", m->name);
-                    m->state = MBOX_DISABLED;
-                }
+                else
+                    mlog(LOG_ERR, "'%s' Waiting for IDLE response from server\n", m->name);
             }
             break;
         case MBOX_IDLE:
@@ -633,8 +649,11 @@ void mbox_idle_proc(struct mbox *m) {
             break;
         case MBOX_CHECK_DONE:
             if (mbox_read_ssl(m, false)) {
-                mlog(LOG_DEBUG, "'%s' Check done result '%s'\n", m->name, m->buf);
-                m->state = MBOX_SEND_IDLE;
+                mlog(LOG_DEBUG, "'%s' Check response to DONE command '%s'\n", m->name, m->buf);
+                if (imap_check_tag(m) && imap_is_idle_completed(m)) {
+                    mlog(LOG_DEBUG, "'%s' IDLE completed\n", m->name);
+                    m->state = MBOX_SEND_IDLE;
+                }
             }
             break;
         default:
