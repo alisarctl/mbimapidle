@@ -565,11 +565,17 @@ void mbox_run_sync(struct mbox *m) {
 
 /* Close connection to retry again */
 void mbox_free_conn(struct mbox *m) {
-   CHECK_FREE(m->ssl);
-   CHECK_FREE(m->bio);
-   if (m->sock) close(m->sock);
-   memset(m->buf, 0, m->buf_size);
-   m->buf_len = 0;
+    if (m->ssl) {
+        SSL_free(m->ssl);
+        m->ssl = NULL;
+    }
+    if (m->bio) {
+        BIO_free_all(m->bio);
+        m->bio = NULL;
+    }
+    if (m->sock) close(m->sock);
+    memset(m->buf, 0, m->buf_size);
+    m->buf_len = 0;
 }
 
 void mbox_free(struct mbox *m) {
@@ -581,8 +587,8 @@ void mbox_free(struct mbox *m) {
    CHECK_FREE(m->password);
    CHECK_FREE(m->pass_cmd);
    CHECK_FREE(m->buf);
-   CHECK_FREE(m->ssl);
-   CHECK_FREE(m->bio);
+
+   mbox_free_conn(m);
 
    if (m->sync_args) {
        for (tmp = m->sync_args; *tmp !=NULL; tmp++) {

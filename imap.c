@@ -806,3 +806,10 @@ void mbox_shutdown_ssl(struct mbox *m) {
 
 }
 
+void mbox_free_ssl(void) {
+
+    if (ssl_ctx)
+        SSL_CTX_free(ssl_ctx);
+}
+
+

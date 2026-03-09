@@ -115,7 +115,7 @@ static void mbox_check_state (struct mbox *m) {
         }
     }
 }
-
+#include "base64.h"
 int main(int argc, char *argv[])
 {
     int ch;
@@ -198,6 +198,7 @@ int main(int argc, char *argv[])
     mlog(LOG_INFO, "Exiting gracefully");
     mbox_foreach(&mbox_shutdown_ssl);
     mbox_remove_all();
+    mbox_free_ssl();
 
     return EXIT_SUCCESS;
 }

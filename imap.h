@@ -36,6 +36,7 @@
 void mbox_idle_proc(struct mbox *m);
 bool mbox_init_ssl(void);
 void mbox_shutdown_ssl(struct mbox *m);
+void mbox_free_ssl(void);
 
 
 #endif /*__IMAP__H_ */
