@@ -581,6 +581,8 @@ void mbox_free_conn(struct mbox *m) {
 
 void mbox_free(struct mbox *m) {
    char **tmp;
+   mbox_free_conn(m);
+
    CHECK_FREE(m->name);
    CHECK_FREE(m->hostname);
    CHECK_FREE(m->username);
@@ -589,8 +591,6 @@ void mbox_free(struct mbox *m) {
    CHECK_FREE(m->pass_cmd);
    CHECK_FREE(m->buf);
 
-   mbox_free_conn(m);
-
    if (m->sync_args) {
        for (tmp = m->sync_args; *tmp !=NULL; tmp++) {
            free(*tmp);
@@ -598,6 +598,5 @@ void mbox_free(struct mbox *m) {
        CHECK_FREE(m->sync_args);
    }
 
-   if (m->sock) close(m->sock);
    free(m);
 }
