@@ -51,6 +51,7 @@
 extern volatile int main_loop_running;
 
 static SSL_CTX *ssl_ctx = NULL;
+#define RESET_BUFFER(m) memset(m->buf, 0, m->buf_size); m->buf_len = 0;
 
 static inline void handle_failure(struct mbox *m) {
     uint32_t delay;
@@ -182,21 +183,17 @@ static void mbox_connect (struct mbox *m) {
 static bool mbox_read (struct mbox *m) {
 
     int idx = 0;
-    int i = 0;
     int rc;
     bool ret = false;
 
-    memset(m->buf, 0, m->buf_size);
-    m->buf_len = 0;
+    idx = m->buf_len;
 
     while(main_loop_running) {
-        rc = recv(m->sock, m->buf + idx, 64, MSG_DONTWAIT);
-
+        rc = recv(m->sock, m->buf + idx, m->buf_size - m->buf_len, MSG_DONTWAIT);
         if (rc == -1) {
-            i++;
-            /* FIXME - TIMEOUT */
-            if (errno == EAGAIN && i < 10000000) {
-                continue;
+            if (errno == EAGAIN) {
+                printf("Retrying\n");
+                break;
             } else {
                 mlog(LOG_INFO, "%s Timeout getting server caps\n", m->name);
                 handle_failure(m);
@@ -352,19 +349,63 @@ static int handle_io_failure(struct mbox *m, int res)
     }
 }
 
-static void mbox_bio_init(struct mbox *m) {
+static int mbox_skip_cert_validation(int unused, X509_STORE_CTX *ctx) {
+    (void)unused;
+    (void)ctx;
+    return 1;
+}
+
+
+static bool mbox_bio_init(struct mbox *m) {
+    bool ret = false;
 
     m->bio = BIO_new(BIO_s_socket());
 
     if (m->bio == NULL) {
         mlog(LOG_ERR, "'%s' Failed to create BIO socket wrapper\n", m->name);
         handle_failure(m);
-        return;
+        goto end;
     }
 
     /* This seems to reset O_NONBLOCK */
     BIO_set_fd(m->bio, m->sock, BIO_CLOSE);
     BIO_socket_nbio(m->sock, 1);
+
+    ret = true;
+end:
+    return ret;
+}
+
+static bool mbox_ssl_new (struct mbox *m) {
+    bool ret = false;
+
+    m->ssl = SSL_new(ssl_ctx);
+    if (m->ssl == NULL) {
+        mlog(LOG_ERR,"'%s' Failed to create the SSL object\n", m->name);
+        goto end;
+    }
+
+    SSL_set_bio(m->ssl, m->bio, m->bio);
+
+    if (!SSL_set_tlsext_host_name(m->ssl, m->hostname)) {
+        mlog(LOG_ERR, "'%s' Failed to set the SNI hostname\n", m->name);
+        goto end;
+    }
+
+    if (m->check_cert) {
+        mlog(LOG_DEBUG, "'%s' Setting hostname %s for certificate validation\n", m->name, m->hostname);
+        if (!SSL_set1_host(m->ssl, m->hostname)) {
+            mlog(LOG_ERR, "'%s' Failed to set the certificate verification hostname\n", m->name);
+            goto end;
+        }
+    } else {
+        SSL_set_verify(m->ssl, SSL_VERIFY_PEER, mbox_skip_cert_validation);
+        mlog(LOG_WARN, "'%s' Skipping certificate validation\n", m->name);
+    }
+
+    ret = true;
+end:
+    return ret;
 }
 
 static void mbox_starttls(struct mbox *m) {
@@ -382,7 +423,7 @@ static void mbox_starttls(struct mbox *m) {
         mlog(LOG_INFO, "'%s' Failed to send starttls\n", m->name);
         handle_failure(m);
     } else {
-        m->state = MBOX_STARTTLS_HANDSHAKE;
+        m->state = MBOX_STARTTLS_OFFER;
     }
 }
 
@@ -425,43 +466,18 @@ static void mbox_tls_login(struct mbox *m) {
     free(msg);
 }
 
-static int mbox_skip_cert_validation(int unused, X509_STORE_CTX *ctx) {
-    (void)unused;
-    (void)ctx;
-    return 1;
-}
-
 static int tls_handshake(struct mbox *m) {
     int ret = 0;
-
-    m->ssl = SSL_new(ssl_ctx);
-    if (m->ssl == NULL) {
-        mlog(LOG_ERR,"'%s' Failed to create the SSL object\n", m->name);
-        goto end;
-    }
-
-    SSL_set_bio(m->ssl, m->bio, m->bio);
-
-    if (!SSL_set_tlsext_host_name(m->ssl, m->hostname)) {
-        mlog(LOG_ERR, "'%s' Failed to set the SNI hostname\n", m->name);
-        goto end;
-    }
-
-    if (m->check_cert) {
-        mlog(LOG_DEBUG, "'%s' Setting hostname %s for certificate validation\n", m->name, m->hostname);
-        if (!SSL_set1_host(m->ssl, m->hostname)) {
-            mlog(LOG_ERR, "'%s' Failed to set the certificate verification hostname\n", m->name);
-            goto end;
-        }
-    } else {
-        SSL_set_verify(m->ssl, SSL_VERIFY_PEER, mbox_skip_cert_validation);
-        mlog(LOG_WARN, "'%s' Skipping certificate validation\n", m->name);
+    if (!m->ssl && !mbox_ssl_new(m)) {
+        mlog(LOG_ERR, "'%s' failed to init ssl\n", m->name);
+        goto end;;
     }
 
     /* Do the handshake with the server */
     while (main_loop_running && (ret = SSL_connect(m->ssl)) != 1) {
-        if (handle_io_failure(m, ret) == 1)
-            continue; /* Retry */
+        if (handle_io_failure(m, ret) == 1) {
+            break; /* Retry */
+        }
         mlog(LOG_ERR,"'%s' Failed to connect to server\n", m->name);
         goto end; /* Cannot retry: error */
     }
@@ -475,9 +491,6 @@ end:
 
 static bool mbox_read_ssl(struct mbox *m, bool block) {
     int eof = 0;
-
-    memset(m->buf, 0, m->buf_size);
-    m->buf_len = 0;
 
     while (main_loop_running && !eof && !SSL_read_ex(m->ssl, m->buf, m->buf_size, &m->buf_len)) {
         switch (handle_io_failure(m, 0)) {
@@ -571,18 +584,24 @@ void mbox_idle_proc(struct mbox *m) {
         case MBOX_CHECK_SRV_CAPS:
             mlog(LOG_DEBUG, "'%s' check server caps\n", m->name);
             check_srv_caps(m);
+            RESET_BUFFER(m);
             break;
         case MBOX_CONNECT_STARTTLS:
             mlog(LOG_DEBUG, "'%s' starttls connection...\n", m->name);
             mbox_starttls(m);
+            RESET_BUFFER(m);
+            break;
+        case MBOX_STARTTLS_OFFER:
+            if (mbox_read(m)) {
+                /* FIXME, check STARTTLS OFFER */
+                m->state = MBOX_STARTTLS_HANDSHAKE;
+            }
             break;
         case MBOX_STARTTLS_HANDSHAKE:
-            if (mbox_read(m)) {
-                if(tls_handshake(m) > 0) {
-                    mbox_tls_login(m);
-                    m->state = MBOX_STARTTLS_CHECK_LOGIN;
-                }
-            }
+             if(tls_handshake(m) > 0) {
+                 mbox_tls_login(m);
+                 m->state = MBOX_STARTTLS_CHECK_LOGIN;
+             }
             break;
         case MBOX_CONNECT_TLS:
             mlog(LOG_DEBUG, "'%s' tls connection\n", m->name);
@@ -601,6 +620,7 @@ void mbox_idle_proc(struct mbox *m) {
         case MBOX_TLS_LOGIN:
             mbox_tls_login(m);
             m->state = MBOX_STARTTLS_CHECK_LOGIN;
+            RESET_BUFFER(m);
             break;
         case MBOX_STARTTLS_CHECK_LOGIN:
             if (mbox_read_ssl(m, false)) {
@@ -609,6 +629,7 @@ void mbox_idle_proc(struct mbox *m) {
                         mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
                         m->state = MBOX_SELECT;
                         m->nfails = 0;
+                        RESET_BUFFER(m);
                     } else {
                         mlog(LOG_DEBUG,"'%s' login failed\n", m->name);
                         handle_failure(m);
@@ -619,6 +640,7 @@ void mbox_idle_proc(struct mbox *m) {
         case MBOX_SELECT:
             mlog(LOG_DEBUG, "'%s' sending select\n", m->name);
             mbox_select(m);
+            RESET_BUFFER(m);
             break;
         case MBOX_CHECK_SELECT:
             mlog(LOG_DEBUG, "'%s' checking select result\n", m->name);
@@ -636,6 +658,7 @@ void mbox_idle_proc(struct mbox *m) {
         case MBOX_SEND_IDLE:
             mlog(LOG_DEBUG, "'%s' sending IDLE for server\n", m->name);
             mbox_send_idle(m);
+            RESET_BUFFER(m);
             break;
         case MBOX_CHECK_IDLE:
             if (mbox_read_ssl(m, false)) {
@@ -644,6 +667,7 @@ void mbox_idle_proc(struct mbox *m) {
                     m->state = MBOX_IDLE;
                     m->re_idle_in = MIN2MS(m->idle_timeout);
                     mbox_run_sync(m);
+                    RESET_BUFFER(m);
                 }
                 else
                     mlog(LOG_ERR, "'%s' Waiting for IDLE response from server\n", m->name);
@@ -655,12 +679,14 @@ void mbox_idle_proc(struct mbox *m) {
                     mlog(LOG_DEBUG, "'%s' Running sync command\n", m->name);
                     mbox_run_sync(m);
                 }
+                RESET_BUFFER(m);
             } else {
                 COUNTDOWN(m->re_idle_in, MIN2MS(m->idle_timeout));
                 if (m->re_idle_in == 0) {
                     mlog(LOG_DEBUG, "'%s' Sending done \n", m->name);
                     m->state = MBOX_CHECK_DONE;
                     mbox_send_done(m);
+                    RESET_BUFFER(m);
                 }
             }
             break;
@@ -671,6 +697,7 @@ void mbox_idle_proc(struct mbox *m) {
                     mlog(LOG_DEBUG, "'%s' IDLE completed\n", m->name);
                     m->state = MBOX_SEND_IDLE;
                 }
+                RESET_BUFFER(m);
             }
             break;
         default:
@@ -714,8 +741,7 @@ end:
 void mbox_shutdown_ssl(struct mbox *m) {
     int ret;
 
-    if (m->state != MBOX_DISABLED && m->state > MBOX_CONNECT_TLS) {
-        assert(m->ssl != NULL);
+    if (m->state != MBOX_DISABLED && m->ssl) {
         while ((ret = SSL_shutdown(m->ssl)) != 1) {
             if (ret < 0 && handle_io_failure(m, ret) == 1)
                 continue; /* Retry */

@@ -92,4 +92,10 @@ static inline void mlog (int level, const char *format, ...)
     va_end(args);
 }
 
+static inline void tick_wait(void) {
+    struct timespec ts;
+    ts.tv_sec = TICK_MS / 1000;
+    ts.tv_nsec = (TICK_MS % 1000) * 1000000;
+    nanosleep(&ts, &ts);
+}
 #endif

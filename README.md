@@ -95,7 +95,6 @@ TODO
 
 # TODO
 * password command configuration
-* SIGUSR1 support to restart the process
 * oauth https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth
 * Handle sync_command not found
 * Redirect sync command output to logs

@@ -461,7 +461,10 @@ bool conf_init() {
             m->name = malloc(strlen(p) + 4);
             memset(m->name, 0, strlen(p) + 4);
             memcpy(m->name, "MBOX: ", 6);
+
             m->check_cert = true;
+            m->state_timeout = SEC_MS(10);
+
             strncpy(m->name + 6, p + 1, strlen(p) - 2);
             in_block = true; in_general = false;
             TAILQ_INSERT_HEAD(&mbox_head, m, mboxes);

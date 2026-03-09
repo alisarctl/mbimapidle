@@ -71,7 +71,7 @@ static void sig_handler(int signum) {
 
     if (signum == SIGHUP) {
         if (reload_all || countdown_reload != 0) {
-            mlog(LOG_INFO, "Daemon is reloading, ignoring SIGHUP\n");
+            mlog(LOG_INFO, "Daemon is starting up or reloading, ignoring SIGHUP\n");
         } else {
             reload_all = true;
             countdown_reload = SEC_MS(10);
@@ -119,7 +119,6 @@ static void mbox_check_state (struct mbox *m) {
 int main(int argc, char *argv[])
 {
     int ch;
-    struct timespec ts;
     struct sigaction sa;
 
     while ((ch = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
@@ -166,8 +165,6 @@ int main(int argc, char *argv[])
     if (sigaction(SIGHUP, &sa, NULL) == -1)
         mlog(LOG_ERR, "Failed to set SIGTERM action\n");
 
-    ts.tv_sec = TICK_MS / 1000;
-    ts.tv_nsec = (TICK_MS % 1000) * 1000000;
 
     while (main_loop_running) {
 
@@ -175,6 +172,7 @@ int main(int argc, char *argv[])
         COUNTDOWN(countdown_reload, 0);
         if (reload_all) {
 
+            mlog(LOG_INFO, "Reloading configuration\n");
             mbox_foreach(&mbox_shutdown_ssl);
             mbox_remove_all();
 
@@ -188,13 +186,13 @@ int main(int argc, char *argv[])
             reload_all = false;
         }
 
-        /* Check mbox state */
-        mbox_foreach(&mbox_check_state);
-
         /* Process messages/connections/etc.*/
         mbox_foreach(&mbox_proc);
 
-        nanosleep(&ts, &ts);
+        /* Check mbox state */
+        mbox_foreach(&mbox_check_state);
+
+        tick_wait();
     }
 
     mlog(LOG_INFO, "Exiting gracefully");
