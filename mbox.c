@@ -573,7 +573,10 @@ void mbox_free_conn(struct mbox *m) {
         BIO_free_all(m->bio);
         m->bio = NULL;
     }
-    if (m->sock) close(m->sock);
+    if (m->sock) {
+        close(m->sock);
+        m->sock = -1;
+    }
     memset(m->buf, 0, m->buf_size);
     m->buf_len = 0;
 }
