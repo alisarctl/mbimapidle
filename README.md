@@ -92,7 +92,6 @@ $ rc-service -U mbimapidle start
 TODO
 
 # TODO
-* Adaptative timeout
 * configuration to skip certificate validation
 * password command configuration
 * SIGUSR1 support to restart the process

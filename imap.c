@@ -54,6 +54,19 @@ static SSL_CTX *ssl_ctx = NULL;
 
 #define COUNTDOWN(_val,_reset) _val = _val == 0 ? _reset : _val <= TICK_MS ? 0 : _val - TICK_MS
 
+static inline void handle_failure(struct mbox *m) {
+    uint32_t delay;
+
+    m->nfails++;
+    delay = m->nfails << 4;
+    m->delay = SEC_MS(delay);
+    m->state = MBOX_INIT_CONNECT;
+    mbox_free_conn(m);
+    m->state_timeout = SEC_MS(10);
+
+    mlog(LOG_DEBUG,"'%s' retrying connection in %lu seconds\n", m->name, delay);
+}
+
 static bool imap_check_tag(struct mbox *m) {
     char msg_tag[12];
 
@@ -115,8 +128,8 @@ static void mbox_conn_init (struct mbox *m) {
     if ((hent = gethostbyname(m->hostname)) == NULL) {
         mlog(LOG_ERR, "'%s' Failed to get host info for hostname '%s'\n",
                 m->name, m->hostname);
-        /* FIXME, maybe re-try lookup later */
-        m->state = MBOX_DISABLED;
+
+        handle_failure(m);
         return;
     }
 
@@ -126,12 +139,12 @@ static void mbox_conn_init (struct mbox *m) {
     m->servaddr.sin_addr         = *((struct in_addr *)hent->h_addr);
 
     m->sock = socket (AF_INET, SOCK_STREAM, 0);
-    if (m->sock < 0) 
+    if (m->sock < 0)
         mlog(LOG_DEBUG, "'%s' Failed to create socket\n", m->name);
 
     flags = fcntl(m->sock, F_GETFL, 0);
     fcntl(m->sock, F_SETFL, flags | O_NONBLOCK);
-    m->state = MBOX_RETRY_CONNECT;
+    m->state = MBOX_TRY_CONNECT;
 }
 
 static void mbox_connect (struct mbox *m) {
@@ -149,15 +162,14 @@ static void mbox_connect (struct mbox *m) {
                 else if (m->tls_type == TLS_TYPE_SSL)
                     m->state = MBOX_CONNECT_TLS;
                 else
+                    /* FIXME */
                     m->state = MBOX_DISABLED;
                 break;
             }
 
-            m->state = MBOX_RETRY_CONNECT;
-            mlog(LOG_INFO, "'%s' Failed to connect to %s port %u (error: %s), "
-                   "retrying in 10 seconds\n",
-                   m->name, m->hostname, m->port, strerror(errno));
-            m->delay = SEC_MS(10);
+            mlog(LOG_INFO, "'%s' Failed to connect to %s port %u (error: %s) \n",
+                 m->name, m->hostname, m->port, strerror(errno));
+            handle_failure(m);
             break;
         }
     }
@@ -183,8 +195,7 @@ static bool mbox_read (struct mbox *m) {
                 continue;
             } else {
                 mlog(LOG_INFO, "%s Timeout getting server caps\n", m->name);
-                m->state = MBOX_RETRY_CONNECT;
-                ret = false;
+                handle_failure(m);
                 break;
             }
         } else {
@@ -265,7 +276,7 @@ static void check_srv_caps (struct mbox *m) {
     } else if (m->tls_type == TLS_TYPE_SSL) {
         m->state = MBOX_TLS_LOGIN;
     } else {
-        mlog(LOG_INFO, "'%s' FIXME: Plain communication not yet implemented, disabling\n", m->name);
+        mlog(LOG_INFO, "'%s' FIXME: Plain communication is not yet implemented, disabling\n", m->name);
         goto disable;
     }
 
@@ -343,9 +354,7 @@ static void mbox_bio_init(struct mbox *m) {
 
     if (m->bio == NULL) {
         mlog(LOG_ERR, "'%s' Failed to create BIO socket wrapper\n", m->name);
-        close(m->sock);
-        m->sock = -1;
-        m->state = MBOX_DISABLED;
+        handle_failure(m);
         return;
     }
 
@@ -366,10 +375,8 @@ static void mbox_starttls(struct mbox *m) {
     rc = send(m->sock, msg, strlen(msg), 0);
 
     if (rc != strlen(msg)) {
-        mlog(LOG_INFO, "'%s' Failed to send starttls, retrying connection\n", m->name);
-        m->state = MBOX_RETRY_CONNECT;
-        close(m->sock);
-        m->sock = -1;
+        mlog(LOG_INFO, "'%s' Failed to send starttls\n", m->name);
+        handle_failure(m);
     } else {
         m->state = MBOX_STARTTLS_HANDSHAKE;
     }
@@ -446,13 +453,8 @@ static int tls_handshake(struct mbox *m) {
 
     return ret;
 end:
-
     ERR_print_errors_fp(stderr);
-
-    /* FIXME: Should we re-try? */
-    m->state = MBOX_DISABLED;
-    mbox_free_conn(m);
-    mlog(LOG_ERR, "'%s' disabled\n", m->name);
+    handle_failure(m);
     return -1;
 }
 
@@ -489,9 +491,8 @@ static bool mbox_read_ssl(struct mbox *m, bool block) {
 
 end:
     ERR_print_errors_fp(stderr);
-    mbox_free_conn(m);
     mlog(LOG_ERR, "'%s' X Error retry connect eof:%d\n", m->name, eof);
-    m->state = MBOX_RETRY_CONNECT;
+    handle_failure(m);
     return false;
 }
 
@@ -542,7 +543,7 @@ void mbox_idle_proc(struct mbox *m) {
             mlog(LOG_DEBUG, "'%s' init connnection\n", m->name);
             mbox_conn_init(m);
             break;
-        case MBOX_RETRY_CONNECT:
+        case MBOX_TRY_CONNECT:
             mlog(LOG_DEBUG, "'%s' connecting...\n", m->name);
             mbox_connect(m);
             break;
@@ -592,9 +593,10 @@ void mbox_idle_proc(struct mbox *m) {
                     if (imap_check_login(m)) {
                         mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
                         m->state = MBOX_SELECT;
+                        m->nfails = 0;
                     } else {
-                        mlog(LOG_DEBUG,"'%s' login failed, disabling\n", m->name);
-                        m->state = MBOX_DISABLED;
+                        mlog(LOG_DEBUG,"'%s' login failed\n", m->name);
+                        handle_failure(m);
                     }
                 }
             }
@@ -610,8 +612,8 @@ void mbox_idle_proc(struct mbox *m) {
                     if (imap_check_select(m)) {
                         m->state = MBOX_SEND_IDLE;
                     } else {
-                        mlog(LOG_DEBUG, "'%s' Failed to select INBOX, disabling (got %s)\n", m->name, m->buf);
-                        m->state = MBOX_DISABLED;
+                        mlog(LOG_DEBUG, "'%s' Failed to select INBOX (got %s)\n", m->name, m->buf);
+                        handle_failure(m);
                     }
                 }
             }

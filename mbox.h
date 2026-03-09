@@ -45,7 +45,7 @@
 
 enum {
     MBOX_INIT_CONNECT = 0,
-    MBOX_RETRY_CONNECT,
+    MBOX_TRY_CONNECT,
     MBOX_GET_SRV_CAPS,
     MBOX_CHECK_SRV_CAPS,
     MBOX_CONNECT_STARTTLS,
@@ -91,6 +91,7 @@ struct mbox {
     size_t    buf_len;
     int       state;
     int       old_state;       /* Save old state to check if we are stuck */
+    uint32_t  nfails;          /* Number of times we got some failures */
     uint32_t  state_timeout;   /* Single state timeout, not applicable to MBOX_IDLE */
     pid_t     sync_pid;        /* pid of the sync command */
     uint32_t  re_idle_in;      /* DONE -> IDLE Sequence in ms time */
