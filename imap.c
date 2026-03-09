@@ -77,9 +77,12 @@ static bool imap_check_tag(struct mbox *m) {
 }
 
 static bool imap_is_idle_completed(struct mbox *m) {
-    if (strstr("OK Idle completed", m->buf))
-        return true;
-    return false;
+    char idle_msg[30];
+
+    memset (idle_msg, 0, sizeof(idle_msg));
+    sprintf(idle_msg, "A%010d OK Idle completed", m->tag);
+
+    return !strncmp(m->buf, idle_msg, 29);
 }
 
 static bool imap_check_idle(struct mbox *m) {
@@ -663,7 +666,7 @@ void mbox_idle_proc(struct mbox *m) {
         case MBOX_CHECK_DONE:
             if (mbox_read_ssl(m, false)) {
                 mlog(LOG_DEBUG, "'%s' Check response to DONE command '%s'\n", m->name, m->buf);
-                if (imap_check_tag(m) && imap_is_idle_completed(m)) {
+                if (imap_is_idle_completed(m)) {
                     mlog(LOG_DEBUG, "'%s' IDLE completed\n", m->name);
                     m->state = MBOX_SEND_IDLE;
                 }
