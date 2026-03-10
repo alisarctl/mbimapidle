@@ -31,6 +31,7 @@
 
 #include <stdarg.h>
 #include <syslog.h>
+#include <stdbool.h>
 #include <time.h>
 
 #define TICK_MS 200
@@ -97,6 +98,8 @@ static inline void tick_wait(void) {
     nanosleep(&ts, &ts);
 }
 
+char *get_conf_file_path (void);
+char *get_conf_fifo_path (void);
 
 #define assert_not_reached() { mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); exit(EXIT_FAILURE);}
 

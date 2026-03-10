@@ -116,6 +116,7 @@ static void mbox_check_state (struct mbox *m) {
 
 int main(int argc, char *argv[])
 {
+    char *fifo;
     int ch;
     struct sigaction sa;
 

@@ -376,7 +376,6 @@ bool conf_init() {
 
     FILE *config;
     ssize_t rc;
-    size_t len;
     bool in_block, in_general;
     char *p = NULL;
     char *line = NULL;
@@ -386,41 +385,14 @@ bool conf_init() {
     int idx = 0;
     size_t linecap = 0;
     int num_mbox = 0;
-    char *config_home = getenv("XDG_CONFIG_HOME");
-    char *home = getenv("HOME");
-    if (!home) {
-            mlog(LOG_ERR,"HOME env is not set aborting\n");
-            return false;
-    }
 
     TAILQ_INIT(&mbox_head);
 
-    if (!config_home) {
-        len = strnlen(home, PATH_MAX);
+    p = get_conf_file_path();
+    printf("p:%s\n", p);
+    if (!p) return false;
 
-        /* .config/mbimapidle/mbimapidlerc + '\0' = 32 */
-        assert (len < PATH_MAX - 32);
-
-        mlog(LOG_INFO,"XDG_CONFIG_HOME not set, assuming ~/.config\n");
-        p = malloc(len + 32);
-        memset(p, 0, len + 32);
-
-        sprintf(p, "%s/.config/mbimapidle/%s", home, CONFIG_FNAME);
-        config = fopen (p, "r");
-
-    } else {
-        len = strnlen(config_home, PATH_MAX);
-
-        /* $XDG_CONFIG_HOME + mbimapidle/mbimapidlerc + '\0' = 32 */
-        assert (len < PATH_MAX - 25);
-
-        mlog(LOG_INFO, "Loading configuration %s\n", config_home);
-        p = malloc(len + 25);
-        memset (p, 0, len + 25);
-
-        sprintf(p, "%s/mbimapidle/%s", config_home, CONFIG_FNAME);
-        config = fopen(p, "r");
-    }
+    config = fopen(p, "r");
 
     if (!config) {
         mlog(LOG_ERR,"Failed to load configuration file '%s'\n", strerror(errno));
@@ -428,6 +400,7 @@ bool conf_init() {
     }
 
     if (p) free(p);
+    p = NULL;
 
     in_general = false;
     in_block = false;

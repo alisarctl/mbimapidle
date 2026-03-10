@@ -8,7 +8,7 @@ BINDIR=		${PREFIX}/bin
 MANDIR=		${PREFIX}/share/man/man
 LIBDIR=		${PREFIX}/lib
 
-SRCS= main.c mbox.c imap.c base64.c
+SRCS= main.c mbox.c imap.c base64.c common.c
 
 CFLAGS+=       -I${.CURDIR} -Wall
 LDFLAGS+=      -lssl -lcrypto
