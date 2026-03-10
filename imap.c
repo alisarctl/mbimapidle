@@ -46,6 +46,7 @@
 
 #include "imap.h"
 #include "common.h"
+#include "base64.h"
 
 extern volatile int main_loop_running;
 
@@ -77,6 +78,13 @@ static bool imap_check_tag(struct mbox *m) {
     return strstr(m->buf, msg_tag) != NULL;
 }
 
+static bool imap_is_sasl_challenge(struct mbox *m) {
+
+    return m->buf[m->buf_len - 1] == '=' &&
+           m->buf[m->buf_len - 2] == '=' &&
+           m->buf[0] == '+';
+}
+
 static bool imap_is_idle_completed(struct mbox *m) {
     char idle_msg[30];
 
@@ -101,20 +109,43 @@ static bool imap_check_idle(struct mbox *m) {
     return false;
 }
 
+static void imap_decode64(struct mbox *m) {
+    char *tmp;
+
+    printf("String to decode %s\n", m->buf);
+    tmp = b64_decode(m->buf + 2, m->buf_len);
+    RESET_BUFFER(m);
+
+    m->buf_len = strlen(tmp);
+    strncpy(m->buf, tmp, m->buf_len);
+
+    printf("Decoded string '%s'\n", m->buf);
+    free(tmp);
+}
+
 static bool imap_check_select(struct mbox *m) {
-    if (strstr(m->buf, "Select completed") != NULL) {
+    if (strstr(m->buf, "Select completed") != NULL)
         return true;
-    } else if (strstr(m->buf, "[AUTHENTICATIONFAILED]") != NULL) {
+
+    if (strstr(m->buf, "selected") != NULL)
+        return true;
+
+    if (strstr(m->buf, "[AUTHENTICATIONFAILED]") != NULL)
         return false;
-    }
+
     return false;
 }
 
 static bool imap_check_login(struct mbox *m) {
+    mlog(LOG_DEBUG, "'%s' Login response from server %s\n", m->name, m->buf);
     if (strstr(m->buf, "Logged in") != NULL) {
-        mlog(LOG_DEBUG, "'%s' Login response from server %s\n", m->name, m->buf);
         return true;
     }
+
+    if (strstr(m->buf, "authenticated") != NULL) {
+        return true;
+    }
+
     return false;
 }
 
@@ -123,7 +154,17 @@ static bool imap_is_keep_alive(struct mbox *m) {
     if (strstr(m->buf, "* OK Still here") != NULL)
         return true;
     return false;
- }
+}
+
+static bool imap_is_capability(struct mbox *m) {
+    if (!strncmp(m->buf, "* OK [CAPABILITY ", 17))
+        return true;
+    if (!strncmp(m->buf, "* OK CAPABILITY ", 16))
+        return true;
+    if (!strncmp(m->buf, "* CAPABILITY ", 13))
+        return true;
+    return false;
+}
 
 static void mbox_conn_init (struct mbox *m) {
     struct hostent *hent;
@@ -211,42 +252,12 @@ static bool mbox_read_socket (struct mbox *m, bool block) {
 
 static void check_srv_caps (struct mbox *m) {
     char *p, *brkb;
-    int p1 = 0, p2 = 0, idx = 0;
+    bool is_cap = false;
 
     mlog(LOG_DEBUG, "'%s' srv caps %s\n", m->name, m->buf);
 
-    /* Perform sanity checks on the caps buffer */
-    if (strncmp(m->buf, "* OK", 4) != 0) {
-        goto out;
-    }
-
-    idx = 4;
-    p  = m->buf + idx;
-    while (p < m->buf + m->buf_size) {
-        if ( *p == '[' ) p1 = idx;
-        if ( *p == ']' ) {
-            p2 = idx;
-            break;
-        }
-        p = m->buf + idx++;
-    }
-
-    if (p1 == 0 || p2 == 0) {
-        goto out;
-    }
-
-    /* String too short, check that to avoid overflowing */
-    if (p1 + 10 > m->buf_len ) {
-        goto out;
-    }
-
-    /* Check CAPABILITY string, */
-    if (strncmp(m->buf + p1, "CAPABILITY", 10) != 0) {
-        goto out;
-    }
-
-    for (p = strtok_r(m->buf + p1 + 10, " ", &brkb);
-         p < m->buf + p2;
+    for (p = strtok_r(m->buf, " ", &brkb);
+         p;
          p = strtok_r(NULL, " ", &brkb)) {
         if (!strncmp(p, "IDLE", 4)) {
             m->caps |= CAPS_IDLE;
@@ -254,13 +265,28 @@ static void check_srv_caps (struct mbox *m) {
             m->caps |= CAPS_STARTTLS;
         } else if (!strncmp(p, "AUTH=PLAIN", 10)) {
             m->caps |= CAPS_AUTH_PLAIN;
+        } else if (!strncmp(p, "AUTH=XOAUTH2", 12)) {
+            m->caps |= CAPS_AUTH_XOAUTH2;
         } else if (!strncmp(p, "ready", 5)) {
             m->caps |= CAPS_READY;
-        }
+        } else if (!strncmp(p, "[CAPABILITY", 11) ||
+                   !strncmp(p, "CAPABILITY", 10))
+            is_cap = true;
+    }
+
+    if (!is_cap) {
+        goto out;
     }
 
     if (!(m->caps & CAPS_AUTH_PLAIN)) {
         mlog(LOG_INFO, "'%s' Server doesn't support AUTH:PLAIN, don't know how to authenticate, disabling\n", m->name);
+        goto disable;
+    }
+
+    if (!(m->caps & CAPS_AUTH_XOAUTH2) && m->auth_type == AUTH_TYPE_XOAUTH2) {
+        mlog(LOG_WARN,
+             "'%s' Server doesn't support XOAUTH2 authentication\n",
+             m->name);
         goto disable;
     }
 
@@ -271,17 +297,18 @@ static void check_srv_caps (struct mbox *m) {
             mlog(LOG_INFO, "'%s' Server doesn't support STARTTLS, disabling\n", m->name);
             goto disable;
         }
-    } else if (m->tls_type == TLS_TYPE_SSL) {
-        m->state = MBOX_TLS_LOGIN;
-    } else if (m->tls_type == TLS_TYPE_NONE) {
-        m->state = MBOX_LOGIN;
-        mlog(LOG_WARN,
-             "'%s' *** WARNING: Password will be sent to the server un-ecrypted ***\n",
-             m->name);
+    } else if (m->tls_type == TLS_TYPE_SSL || m->tls_type == TLS_TYPE_NONE) {
+        m->state = MBOX_AUTHENTICATE;
+        if (m->tls_type == TLS_TYPE_NONE) {
+            mlog(LOG_WARN,
+                 "'%s' *** WARNING: Password will be sent to the server un-ecrypted ***\n",
+                 m->name);
+        }
     } else
         assert_not_reached();
 
     return;
+    /* FIXME, checl CAPABILITY */
 out:
     mlog(LOG_ERR, "'%s' Unexpected capability message from server, disabling %s\n", m->buf, m->name);
 disable:
@@ -467,16 +494,42 @@ static bool mbox_write(struct mbox *m, char *msg) {
     return ret;
 }
 
-static bool mbox_login(struct mbox *m) {
-    char *msg;
-    size_t msg_len;
+static bool mbox_authenticate(struct mbox *m) {
+    char *msg, *xoauth;
+    char *b64;
+    size_t msg_len, xoauth_len;
     bool ret;
+    int b64_len = 0;
 
-    msg_len = strlen(m->username) + strlen(m->password) + 25;
-    msg = malloc(msg_len);
+    if (m->auth_type == AUTH_TYPE_PLAIN) {
+        msg_len = strlen(m->username) + strlen(m->password) + 25;
+        msg = malloc(msg_len);
 
-    memset(msg, 0, msg_len);
-    sprintf(msg, "A%010d LOGIN \"%s\" \"%s\"\r\n", ++m->tag, m->username, m->password);
+        memset(msg, 0, msg_len);
+        sprintf(msg, "A%010d LOGIN \"%s\" \"%s\"\r\n",
+                ++m->tag, m->username, m->password);
+    } else if (m->auth_type == AUTH_TYPE_XOAUTH2) {
+        xoauth_len = strlen(m->username) + strlen(m->password) + 24;
+
+        xoauth = malloc(xoauth_len);
+        memset(xoauth, 0, xoauth_len);
+
+        sprintf(xoauth, "user=%s\001auth=Bearer %s\001\001",
+                m->username, m->password);
+
+        b64 = b64_encode(xoauth, &b64_len);
+
+        /* tag length + auth message + \r \n */
+        msg_len = b64_len + 36;
+        msg = malloc(msg_len);
+
+        memset(msg, 0, msg_len);
+
+        sprintf(msg, "A%010d AUTHENTICATE XOAUTH2 %s\r\n", ++m->tag, b64);
+        free(xoauth);
+        free(b64);
+    } else
+        assert_not_reached();
 
     if (m->tls_type == TLS_TYPE_NONE) {
         ret = mbox_write(m, msg);
@@ -609,6 +662,36 @@ static bool mbox_send_done(struct mbox *m) {
     return ret;
 }
 
+static bool mbox_send_empty(struct mbox *m) {
+    char msg[32];
+    bool ret;
+
+    memset(msg, 0, sizeof(msg));
+    sprintf(msg, "\r\n");
+    ret = mbox_write_ssl(m, msg);
+
+    if (!ret)
+        mlog(LOG_ERR, "'%s' Failed to send challenge response\n", m->name);
+    return ret;
+}
+
+static bool mbox_query_caps(struct mbox *m) {
+    char msg[32];
+    bool ret;
+
+    memset(msg, 0, sizeof(msg));
+    sprintf(msg, "A%010d CAPABILITY\r\n", ++m->tag);
+
+    if (m->tls_type == TLS_TYPE_NONE)
+        ret = mbox_write(m, msg);
+    else
+        ret = mbox_write_ssl(m, msg);
+
+    if (!ret)
+        mlog(LOG_ERR, "'%s' Failed to send IDLE\n", m->name);
+    return ret;
+}
+
 void mbox_idle_proc(struct mbox *m) {
 
     if (m->state == MBOX_DISABLED)
@@ -624,14 +707,22 @@ void mbox_idle_proc(struct mbox *m) {
             mbox_connect(m);
             break;
         case MBOX_GET_SRV_CAPS:
-            mlog(LOG_DEBUG, "'%s' get server caps\n", m->name);
+            mlog(LOG_DEBUG, "'%s' get server caps %s\n", m->name, m->buf);
             if (mbox_read_socket(m, false)) {
                 m->state = MBOX_CHECK_SRV_CAPS;
             }
             break;
         case MBOX_CHECK_SRV_CAPS:
-            mlog(LOG_DEBUG, "'%s' check server caps\n", m->name);
-            check_srv_caps(m);
+            if (imap_is_capability(m)) {
+                check_srv_caps(m);
+            } else {
+                mlog(LOG_DEBUG, "'%s' query server caps\n", m->name);
+                mbox_query_caps(m);
+                if (m->tls_type == TLS_TYPE_NONE)
+                    m->state = MBOX_GET_SRV_CAPS;
+                else
+                    m->state = MBOX_TLS_GET_SRV_CAPS;
+            }
             RESET_BUFFER(m);
             break;
         case MBOX_CONNECT_STARTTLS:
@@ -647,7 +738,7 @@ void mbox_idle_proc(struct mbox *m) {
             break;
         case MBOX_STARTTLS_HANDSHAKE:
              if(tls_handshake(m) > 0) {
-                 if (mbox_login(m))
+                 if (mbox_authenticate(m))
                      m->state = MBOX_CHECK_LOGIN;
              }
             break;
@@ -665,17 +756,15 @@ void mbox_idle_proc(struct mbox *m) {
                 m->state = MBOX_CHECK_SRV_CAPS;
             }
             break;
-        case MBOX_LOGIN:
-            if (mbox_login(m))
+        case MBOX_AUTHENTICATE:
+            mlog(LOG_INFO, "'%s' authenticating...\n", m->name);
+            if (mbox_authenticate(m)) {
                 m->state = MBOX_CHECK_LOGIN;
-            RESET_BUFFER(m);
-            break;
-        case MBOX_TLS_LOGIN:
-            if (mbox_login(m))
-                m->state = MBOX_CHECK_LOGIN;
+            }
             RESET_BUFFER(m);
             break;
         case MBOX_CHECK_LOGIN:
+            mlog(LOG_DEBUG, "'%s' checking login result\n", m->name);
             if (mbox_read(m, false)) {
                 if (imap_check_tag(m)) {
                     if (imap_check_login(m)) {
@@ -687,6 +776,12 @@ void mbox_idle_proc(struct mbox *m) {
                         mlog(LOG_DEBUG,"'%s' login failed\n", m->name);
                         handle_failure(m);
                     }
+                } else if (m->auth_type == AUTH_TYPE_XOAUTH2 && imap_is_sasl_challenge(m)) {
+                    imap_decode64(m);
+                    mlog(LOG_DEBUG, "'%s' AUTH FAILED '%s'\n", m->name, m->buf);
+                    mbox_send_empty(m);
+                    RESET_BUFFER(m);
+                    m->state = MBOX_DISABLED;
                 }
             }
             break;
@@ -798,11 +893,10 @@ void mbox_shutdown_ssl(struct mbox *m) {
 
     if (m->state != MBOX_DISABLED && m->ssl) {
         while ((ret = SSL_shutdown(m->ssl)) != 1) {
-            if (ret < 0 && handle_io_failure(m, ret) == 1)
-                continue; /* Retry */
+            if (ret < 0)
+                break;
         }
     }
-
 }
 
 void mbox_free_ssl(void) {

@@ -300,6 +300,21 @@ static bool validate_block_config(struct mbox *m, char *key, char *val) {
             return false;
         }
     }
+
+    if (!strncmp(key, "auth", 4)) {
+        val = trim(val);
+        if (!strncmp(val, "plain", 5)) {
+            m->auth_type = AUTH_TYPE_PLAIN;
+            return true;
+        } else if (!strncmp(val, "XOAUTH2", 7)) {
+            m->auth_type = AUTH_TYPE_XOAUTH2;
+            return true;
+        } else {
+            mlog(LOG_ERR, "'%s' invalid auth method '%s'\n", m->name, val);
+            return false;
+        }
+    }
+
     return false;
 }
 
@@ -468,6 +483,7 @@ bool conf_init() {
             memcpy(m->name, "MBOX: ", 6);
 
             m->check_cert = true;
+            m->auth_type = AUTH_TYPE_PLAIN;
             m->state_timeout = SEC_MS(10);
 
             strncpy(m->name + 6, p + 1, strlen(p) - 2);

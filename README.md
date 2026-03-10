@@ -60,6 +60,7 @@ idle_timeout = "10"
 check_certificate="false"
 port = "993"
 tls_type="ssl"
+auth = "plain"
 
 [mbox2]
 hostname = "hostname2"
@@ -69,6 +70,7 @@ sync_cmd = "/usr/bin/mbsync -a"
 port = "143"
 check_certificate="true"
 tls_type = "starttls"
+auth = "XOAUTH2"
 ```
 
 # User service file

@@ -113,7 +113,7 @@ static void mbox_check_state (struct mbox *m) {
         }
     }
 }
-#include "base64.h"
+
 int main(int argc, char *argv[])
 {
     int ch;

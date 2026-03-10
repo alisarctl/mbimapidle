@@ -46,13 +46,12 @@ enum {
     MBOX_TRY_CONNECT,
     MBOX_GET_SRV_CAPS,
     MBOX_CHECK_SRV_CAPS,
-    MBOX_LOGIN,
+    MBOX_AUTHENTICATE,
     MBOX_CHECK_LOGIN,
     MBOX_CONNECT_STARTTLS,
     MBOX_CONNECT_TLS,
     MBOX_TLS_HANDSHAKE,
     MBOX_TLS_GET_SRV_CAPS,
-    MBOX_TLS_LOGIN,
     MBOX_STARTTLS_OFFER,
     MBOX_STARTTLS_HANDSHAKE,
     MBOX_SELECT,
@@ -72,6 +71,12 @@ enum {
     TLS_TYPE_SSL
 };
 
+enum {
+    AUTH_TYPE_INVALID = 0,
+    AUTH_TYPE_PLAIN,
+    AUTH_TYPE_XOAUTH2
+};
+
 struct mbox {
     /* Loaded from configuration */
     char     *name;
@@ -84,6 +89,7 @@ struct mbox {
     uint32_t  idle_timeout;
     uint16_t  port;
     uint8_t   tls_type;
+    uint8_t   auth_type;
     bool      check_cert;
     /* End of loaded from conf fields */
     int       sock;
@@ -105,10 +111,11 @@ struct mbox {
     TAILQ_ENTRY(mbox) mboxes;
 };
 
-#define CAPS_IDLE       (1 << 0)
-#define CAPS_STARTTLS   (1 << 2)
-#define CAPS_AUTH_PLAIN (1 << 3)
-#define CAPS_READY      (1 << 4)
+#define CAPS_IDLE         (1 << 0)
+#define CAPS_STARTTLS     (1 << 2)
+#define CAPS_AUTH_PLAIN   (1 << 3)
+#define CAPS_AUTH_XOAUTH2 (1 << 4)
+#define CAPS_READY        (1 << 5)
 
 typedef void (*mbox_conn) (struct mbox *mbox);
 
