@@ -107,6 +107,25 @@ bool  parse_cmd          (const char *mbox_name,
                           char **cmd,
                           char **argv[]);
 
+#define FREE_STR(ptr) \
+do  { \
+    if (ptr != NULL) { \
+        free(ptr); \
+        ptr = NULL; \
+    } \
+} while (0);
+
+#define FREE_STRV(strv) \
+do { \
+    char **tmp; \
+    if (strv) { \
+        for (tmp = strv; *tmp !=NULL; tmp++) { \
+            free(*tmp);\
+        } \
+        FREE_STR(strv); \
+    } \
+} while (0);
+
 #define assert_not_reached() do { \
     mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); \
     exit(EXIT_FAILURE); \

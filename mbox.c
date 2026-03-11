@@ -255,6 +255,11 @@ static bool check_mbox_fields(struct mbox *m) {
         return false;
     }
 
+    /* Set want pass state so we get the password from pass_cmd */
+    if (m->pass_cmd) {
+        m->state = MBOX_WANT_PASS;
+    }
+
     if (m->port == 0) {
         mlog(LOG_ERR,"Invalid port:%d '%s'\n", m->port, m->name);
         return false;
@@ -360,8 +365,8 @@ bool conf_init() {
             m = (struct mbox*)malloc(sizeof(struct mbox));
             memset(m, 0, sizeof(struct mbox));
             /* strip off '[' and ']' add 'MBOX: ' */
-            m->name = malloc(strlen(p) + 6);
-            memset(m->name, 0, strlen(p));
+            m->name = malloc(strlen(p) + 7);
+            memset(m->name, 0, strlen(p) + 7);
             memcpy(m->name, "MBOX: ", 6);
             strncpy(m->name + 6, p + 1, strlen(p) - 2);
 
@@ -453,33 +458,54 @@ void mbox_run_sync (struct mbox *m) {
     }
 }
 
-#define FREE_STR(ptr) \
-    if (ptr != NULL) { \
-        free(ptr); \
-        ptr = NULL; \
+void mbox_get_pass (struct mbox *m) {
+    int fd[2];
+
+    if (m->sync_pid > 0) {
+        mlog(LOG_DEBUG,"'%s' pass command is still running\n", m->name);
+        return;
     }
 
-#define FREE_STRV(strv) \
-do { \
-    char **tmp; \
-    if (strv) { \
-        for (tmp = strv; *tmp !=NULL; tmp++) { \
-            free(*tmp);\
-        } \
-        FREE_STR(strv); \
-    } \
-} while (0);
+    FREE_STR(m->password);
+
+    if ( pipe(fd) < 0 ) {
+        mlog(LOG_ERR, "'%s' pipe error '%s'", m->name, strerror(errno));
+        return;
+    }
+
+    if ((m->pass_pid = fork()) < 0) {
+        mlog(LOG_ERR, "Failed call fork %s\n", strerror(errno));
+        return;
+    }
+
+    if (m->pass_pid == 0) {
+        int ret;
+        close(fd[0]);
+        dup2(fd[1], 1);
+
+        ret = execvp(m->pass_cmd, m->pass_args);
+        if (ret == -1) {
+            mlog(LOG_ERR, "'%s' Failed to run pass_cmd command '%s':'%s'\n",
+                    m->name, m->pass_cmd, strerror(errno));
+            exit(-1);
+        }
+    } else {
+        close(fd[1]);
+        m->pass_pipe_fd = fd[0];
+    }
+}
 
 /* Close connection to retry again */
 void mbox_free_conn(struct mbox *m) {
     if (m->ssl) {
         SSL_free(m->ssl);
         m->ssl = NULL;
-    }
-    if (m->bio) {
+    } else if (m->bio) {
         BIO_free_all(m->bio);
-        m->bio = NULL;
     }
+
+    m->bio = NULL;
+
     if (m->sock) {
         close(m->sock);
         m->sock = -1;

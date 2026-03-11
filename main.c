@@ -31,6 +31,7 @@
 #include <sys/socket.h>
 #include <sys/select.h>
 #include <sys/types.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
 
@@ -84,6 +85,7 @@ static void sig_handler(int signum) {
         main_loop_running = 0;
 }
 
+#define MAX_PASS_TOKEN_LEN 8192
 static void mbox_proc(struct mbox*m) {
     if (m->state == MBOX_DISABLED)
         return;
@@ -98,6 +100,41 @@ static void mbox_proc(struct mbox*m) {
         }
     }
 
+    if (m->pass_pid > 0) {
+        int status = 0;
+        if (waitpid(m->pass_pid, &status, WNOHANG) == m->pass_pid) {
+            ssize_t nbytes = 0;
+            size_t rc = 0;
+
+            ioctl(m->pass_pipe_fd, FIONREAD, &nbytes);
+
+            if (nbytes > MAX_PASS_TOKEN_LEN - 1) {
+                mlog(LOG_ERR, "'%s' password token is too long\n", m->name);
+                goto disable;
+            }
+            FREE_STR(m->password);
+            m->password = malloc(nbytes + 1);
+            memset (m->password, 0, nbytes + 1);
+
+            do {
+                rc += read(m->pass_pipe_fd, m->password + rc, nbytes - rc);
+                if (rc == -1) {
+                    mlog(LOG_ERR, "unexpected end of read '%s'\n", strerror(errno));
+                    goto disable;
+                }
+            } while (rc != nbytes);
+
+            m->state = MBOX_INIT_CONNECT;
+            goto out;
+
+disable:
+            m->state = MBOX_DISABLED;
+out:
+            m->pass_pid = 0;
+            close(m->pass_pipe_fd);
+        }
+
+    }
     mbox_idle_proc(m);
 }
 

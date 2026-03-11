@@ -698,6 +698,10 @@ void mbox_idle_proc(struct mbox *m) {
         return;
 
     switch(m->state) {
+        case MBOX_WANT_PASS:
+            mlog(LOG_DEBUG, "'%s' getting password from pass_cmd\n", m->name);
+            mbox_get_pass(m);
+            break;
         case MBOX_INIT_CONNECT:
             mlog(LOG_DEBUG, "'%s' init connnection\n", m->name);
             mbox_conn_init(m);

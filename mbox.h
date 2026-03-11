@@ -43,6 +43,7 @@
 
 enum {
     MBOX_INIT_CONNECT = 0,
+    MBOX_WANT_PASS,
     MBOX_TRY_CONNECT,
     MBOX_GET_SRV_CAPS,
     MBOX_CHECK_SRV_CAPS,
@@ -102,6 +103,8 @@ struct mbox {
     uint32_t  nfails;          /* Number of times we got some failures */
     uint32_t  state_timeout;   /* Single state timeout, not applicable to MBOX_IDLE */
     pid_t     sync_pid;        /* pid of the sync command */
+    pid_t     pass_pid;        /* pid of pass command */
+    int       pass_pipe_fd;    /* child pipe fd to read password from */
     uint32_t  re_idle_in;      /* DONE -> IDLE Sequence in ms time */
     uint32_t  delay;           /* Delay in ms to re-connect or to next action */
     uint32_t  caps;
@@ -124,6 +127,7 @@ bool conf_init();
 void mbox_foreach(mbox_conn func);
 void mbox_remove_all(void);
 void mbox_run_sync(struct mbox *m);
+void mbox_get_pass (struct mbox *m);
 void mbox_free_conn(struct mbox *m);
 void mbox_free(struct mbox *m);
 
