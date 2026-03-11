@@ -699,8 +699,13 @@ void mbox_idle_proc(struct mbox *m) {
 
     switch(m->state) {
         case MBOX_WANT_PASS:
-            mlog(LOG_DEBUG, "'%s' getting password from pass_cmd\n", m->name);
-            mbox_get_pass(m);
+            if (!m->pass_pid) {
+                mlog(LOG_DEBUG, "'%s' getting password from pass_cmd\n", m->name);
+                mbox_get_pass(m);
+            } else {
+                mlog(LOG_DEBUG, "'%s' waiting for password from pass_cmd pid:%d\n",
+                     m->name, m->pass_pid);
+            }
             break;
         case MBOX_INIT_CONNECT:
             mlog(LOG_DEBUG, "'%s' init connnection\n", m->name);

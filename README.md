@@ -30,8 +30,6 @@ $ bmake
 # bmake install PREFIX=/usr RC=systemd
 ```
 
-
-
 # Configuration file
 Configuration file is located at
 
@@ -64,12 +62,22 @@ auth = "plain"
 
 [mbox2]
 hostname = "hostname2"
-password  =  "pass2"
+password  =  "pass2" # Comment
 username = "user2"
 sync_cmd = "/usr/bin/mbsync -a"
+idle_timeout = "20"
+check_certificate="false"
 port = "143"
-check_certificate="true"
 tls_type = "starttls"
+auth = "plain"
+
+[gmail]
+hostname = "imap.gmail.com"
+pass_cmd  =  "/home/user/bin/renew-token"
+username = "user2"
+sync_cmd = "/usr/bin/mbsync -a"
+port = "993"
+check_certificate="true"
 auth = "XOAUTH2"
 ```
 
@@ -96,13 +104,14 @@ $ rc-service -U mbimapidle start
 TODO
 
 # TODO
-* password command configuration
-* oauth https://learn.microsoft.com/en-us/exchange/client-developer/legacy-protocols/how-to-authenticate-an-imap-pop-smtp-application-by-using-oauth
-* Handle sync_command not found
+* Buffer size adaptation
 * Redirect sync command output to logs
-* Buffer size
-* Plain communication
-* Detect connection up/down
 * Fix "FIXMEs"
 * man page
 * complete command line arguments
+
+# DONE
+* XOAUTH2 support
+* password command configuration
+* Plain communication
+

@@ -150,7 +150,15 @@ static void mbox_check_state (struct mbox *m) {
         /* Error switching state */
         if (m->state != MBOX_IDLE && m->state != MBOX_INIT_CONNECT && m->state_timeout == 0) {
             mlog(LOG_INFO, "'%s' connection seems to be stuck, re-trying\n", m->name);
+
+            if (m->pass_pid) {
+                kill(m->pass_pid, SIGKILL);
+                close(m->pass_pipe_fd);
+                m->pass_pipe_fd = 0;
+            }
+
             mbox_free_conn(m);
+
             m->state = MBOX_INIT_CONNECT;
             m->state_timeout = SEC_MS(10);
         }

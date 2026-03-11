@@ -104,11 +104,11 @@ static bool check_key_value(char *line, char **key, char **val) {
     assert(key_len > 0);
     assert(quote2_pos > quote1_pos - 1);
 
-    *val = malloc(quote2_pos - quote1_pos);
+    *val = malloc(quote2_pos - quote1_pos + 1);
     memset (*val, 0, quote2_pos - quote1_pos);
     strncpy(*val, line + quote1_pos + 1, quote2_pos - quote1_pos - 1);
 
-    *key = malloc(key_len);
+    *key = malloc(key_len + 1);
     memset(*key, 0, key_len);
     strncpy(*key, line, key_len);
 
@@ -246,7 +246,7 @@ static bool check_mbox_fields(struct mbox *m) {
     }
 
     if (m->password && m->pass_cmd) {
-        mlog(LOG_ERR, "Password or password cmd are configured on %s\n", m->name);
+        mlog(LOG_ERR, "Both password or pass_cmd are configured on %s\n", m->name);
         return false;
     }
 
@@ -349,10 +349,10 @@ bool conf_init() {
         if (!strncmp(p, "[general]", 9)) {
             /* We are already in the general section */
             if (in_general)
-                goto end;
+                goto error_syntax;
             if (general_found) {
                 mlog(LOG_ERR, "Duplicated general section found\n");
-                goto end;
+                goto error_syntax;
             }
             in_general = true; in_block = false;
             general_found = true;
@@ -360,7 +360,7 @@ bool conf_init() {
         /* Opening of a mbox block */
         } else if (p[0] == '[') {
             if (p[strlen(p)-1] != ']' || strlen(p) < 3)
-                goto end;
+                goto error_syntax;
 
             m = (struct mbox*)malloc(sizeof(struct mbox));
             memset(m, 0, sizeof(struct mbox));
@@ -382,16 +382,16 @@ bool conf_init() {
         if (in_general || in_block) {
             /* Check for key=value */
             if (!check_key_value(p, &key, &val))
-                goto end;
+                goto error_syntax;
         } else {
             mlog(LOG_ERR, "Unexpected outside of block configuration %s\n", p);
-            goto end;
+            goto error_syntax;
         }
 
         if (in_general && !validate_general_config(key, val))
-            goto end;
+            goto error_syntax;
         if (in_block && !validate_block_config(m, key, val))
-            goto end;
+            goto error_syntax;
         free(p);
         p = NULL;
     }
@@ -400,7 +400,7 @@ bool conf_init() {
         num_mbox++;
         if (!check_mbox_fields(m)) {
             mlog(LOG_ERR,"Incomplete configuration for mbox '%s'\n", m->name);
-            goto end;
+            goto error_config;
         }
         m->buf_size = 1024;
         m->buf = malloc(m->buf_size);
@@ -409,13 +409,14 @@ bool conf_init() {
 
     if (num_mbox == 0) {
         mlog(LOG_ERR,"No imap mail found in configuration\n");
-        goto end;
+        goto error_config;
     }
 
     fclose(config);
     return true;
-end:
+error_syntax:
     mlog(LOG_ERR, "Syntax error near '%s' line %d\n", p, linenum);
+error_config:
     if (p != NULL) free(p);
     fclose(config);
 

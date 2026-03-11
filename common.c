@@ -83,6 +83,7 @@ static char *get_fpath(const char *fname) {
     conf_dir_path = get_conf_dir_path();
 
     assert (strlen(conf_dir_path) + strlen(fname) + 1 < PATH_MAX);
+    /* adding 2: slash + '\0' */
     fp = malloc (strlen(conf_dir_path) + strlen(fname) + 2);
 
     sprintf(fp, "%s/%s", conf_dir_path, fname);
@@ -112,7 +113,8 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[]) {
 
     sub = val;
     do {
-        if (!isspace(*sub) && !isalnum(*sub) && *sub != '/' && *sub != '-' && *sub != '\0') {
+        if (!isspace(*sub) && !isalnum(*sub) && *sub != '/' && *sub != '-' && *sub != '\0' &&
+            *sub != '.') {
             mlog(LOG_ERR, "'%s' Invalid character %c\n", mbox_name, *sub);
             return false;
         }
