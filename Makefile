@@ -17,3 +17,5 @@ CLEANFILES= ${GENSRCS}
 
 .include <bsd.prog.mk>
 
+help:
+	@echo "Targets are: all, install, clean, help"

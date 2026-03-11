@@ -30,12 +30,18 @@
 
 #include <sys/socket.h>
 #include <sys/select.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
+
 #include <getopt.h>
 
+#include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <signal.h>
 
+#include <errno.h>
 #include <assert.h>
 
 #include "mbox.h"
@@ -116,9 +122,9 @@ static void mbox_check_state (struct mbox *m) {
 
 int main(int argc, char *argv[])
 {
-    char *fifo;
     int ch;
     struct sigaction sa;
+    int ret = EXIT_FAILURE;
 
     while ((ch = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
         switch(ch) {
@@ -144,12 +150,11 @@ int main(int argc, char *argv[])
 
     if (!conf_init()) {
         mlog(LOG_ERR, "Failed to load configuration\n");
-        mbox_foreach(&mbox_free);
-        return EXIT_FAILURE;
+        goto failure_config;
     }
 
     if (!mbox_init_ssl()) {
-        return EXIT_FAILURE;
+        goto failure_ssl;
     }
 
     memset(&sa, 0, sizeof(sa));
@@ -166,7 +171,6 @@ int main(int argc, char *argv[])
 
 
     while (main_loop_running) {
-
         /* Reload configuration on SIGHUP */
         COUNTDOWN(countdown_reload, 0);
         if (reload_all) {
@@ -195,9 +199,14 @@ int main(int argc, char *argv[])
     }
 
     mlog(LOG_INFO, "Exiting gracefully");
-    mbox_foreach(&mbox_shutdown_ssl);
-    mbox_remove_all();
-    mbox_free_ssl();
 
-    return EXIT_SUCCESS;
+    ret = EXIT_SUCCESS;
+
+    mbox_free_ssl();
+failure_ssl:
+    mbox_foreach(&mbox_shutdown_ssl);
+failure_config:
+    mbox_remove_all();
+
+    return ret;
 }

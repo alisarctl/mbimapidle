@@ -30,6 +30,8 @@
 #define __COMMON__H__
 
 #include <stdarg.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <syslog.h>
 #include <stdbool.h>
 #include <time.h>
@@ -99,8 +101,15 @@ static inline void tick_wait(void) {
 }
 
 char *get_conf_file_path (void);
-char *get_conf_fifo_path (void);
 
-#define assert_not_reached() { mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); exit(EXIT_FAILURE);}
+bool  parse_cmd          (const char *mbox_name,
+                          char *val,
+                          char **cmd,
+                          char **argv[]);
+
+#define assert_not_reached() do { \
+    mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); \
+    exit(EXIT_FAILURE); \
+} while (0);
 
 #endif

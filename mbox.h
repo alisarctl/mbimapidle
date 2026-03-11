@@ -84,6 +84,7 @@ struct mbox {
     char     *username;
     char     *password;
     char     *pass_cmd;
+    char    **pass_args;
     char     *sync_cmd;       /* Command to run on new emails */
     char    **sync_args;
     uint32_t  idle_timeout;

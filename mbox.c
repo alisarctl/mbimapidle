@@ -35,7 +35,6 @@
 #include <errno.h>
 #include <limits.h>
 #include <unistd.h>
-#include <libgen.h>
 
 #include <ctype.h>
 
@@ -56,96 +55,6 @@ static char* trim(char *str) {
     *(end+1) = '\0';
 
     return str;
-}
-
-static bool check_sync_command(struct mbox *m, char *val)
-{
-    char **args;
-    char *path, *sub, *brkb, *dirn, *basen;
-    char *tmp = NULL;
-    size_t cmd_len = 0;
-    int idx = 0;
-    int nargs = 0;
-    bool found_in_path = false;
-    bool ret = false;
-
-    /* at least /bin/1 */
-    if (strlen(val) < 6) {
-        mlog(LOG_ERR, "'%s' sync command is too short\n", m->name);
-        return false;
-    }
-
-    sub = val;
-    do {
-        if (!isspace(*sub) && !isalnum(*sub) && *sub != '/' && *sub != '-' && *sub != '\0') {
-            mlog(LOG_ERR, "'%s' Invalid character %c\n", m->name, *sub);
-            return false;
-        }
-    } while(*sub++);
-
-    sub = val;
-    while (!isspace(*sub++)) {cmd_len++;}
-    if (val[cmd_len - 1] == '/') {
-        mlog(LOG_ERR, "'%s' invalid slash terminated sync command '%s' \n", m->name, val);
-        return false;
-    }
-
-    path = strdup(getenv("PATH"));
-    tmp = strdup(val);
-    dirn = dirname(tmp);
-
-    if (strlen(dirn) > strlen(path)) {
-        mlog(LOG_ERR, "'%s' invalid sync command length '%s' \n", m->name, val);
-        goto out;
-    }
-
-    for (sub = strtok_r(path, ":", &brkb);
-         sub;
-         sub = strtok_r(NULL, ":", &brkb))
-    {
-        if (strcmp(sub, dirn) == 0) {
-            found_in_path = true;
-            break;
-        }
-    }
-    free(path);
-
-    if (!found_in_path) {
-        mlog(LOG_ERR, "'%s' sync command '%s' not found in $PATH\n",
-                      m->name, val);
-        goto out;
-    }
-
-    free(tmp);
-    tmp = strdup(val);
-    basen = basename(tmp);
-
-    if (basen[0] == '/' || basen[0] == '.' || basen[0] == '\\') {
-        mlog(LOG_ERR, "'%s' invalid sync command '%s' \n", m->name, val);
-        goto out;
-    }
-
-    sub = basen;
-
-    /* Parse arguments */
-    do {if (isspace(*sub)) nargs++;} while(*sub++);
-
-    args = malloc(sizeof(char *) * (nargs + 2));
-    for (sub = strtok_r(basen, " ", &brkb);
-         sub;
-         sub = strtok_r(NULL, " ", &brkb)) {
-        args[idx++] = strdup(sub);
-    }
-    args[idx] = NULL;
-
-    m->sync_cmd = malloc(cmd_len);
-    memset(m->sync_cmd, 0, cmd_len);
-    strncpy (m->sync_cmd, val, cmd_len);
-    m->sync_args = args;
-    ret = true;
-out:
-    free(tmp);
-    return ret;
 }
 
 static bool check_key_value(char *line, char **key, char **val) {
@@ -242,7 +151,7 @@ static bool validate_block_config(struct mbox *m, char *key, char *val) {
 
     if (!strncmp(key, "sync_cmd", 8)) {
         val = trim(val);
-        return check_sync_command(m, val);
+        return parse_cmd(m->name, val, &m->sync_cmd, &m->sync_args);
     }
 
     if (!strncmp(key, "port", 4)) {
@@ -280,8 +189,8 @@ static bool validate_block_config(struct mbox *m, char *key, char *val) {
     }
 
     if (!strncmp(key, "pass_cmd", 8)) {
-        m->pass_cmd = strdup(val);
-        return true;
+        val = trim(val);
+        return parse_cmd(m->name, val, &m->pass_cmd, &m->pass_args);
     }
 
     if (!strncmp(key, "tls_type", 8)) {
@@ -389,7 +298,7 @@ bool conf_init() {
     TAILQ_INIT(&mbox_head);
 
     p = get_conf_file_path();
-    printf("p:%s\n", p);
+
     if (!p) return false;
 
     config = fopen(p, "r");
@@ -451,15 +360,15 @@ bool conf_init() {
             m = (struct mbox*)malloc(sizeof(struct mbox));
             memset(m, 0, sizeof(struct mbox));
             /* strip off '[' and ']' add 'MBOX: ' */
-            m->name = malloc(strlen(p) + 4);
-            memset(m->name, 0, strlen(p) + 4);
+            m->name = malloc(strlen(p) + 6);
+            memset(m->name, 0, strlen(p));
             memcpy(m->name, "MBOX: ", 6);
+            strncpy(m->name + 6, p + 1, strlen(p) - 2);
 
             m->check_cert = true;
             m->auth_type = AUTH_TYPE_PLAIN;
             m->state_timeout = SEC_MS(10);
 
-            strncpy(m->name + 6, p + 1, strlen(p) - 2);
             in_block = true; in_general = false;
             TAILQ_INSERT_HEAD(&mbox_head, m, mboxes);
             continue;
@@ -524,7 +433,7 @@ void mbox_remove_all(void) {
     }
 }
 
-void mbox_run_sync(struct mbox *m) {
+void mbox_run_sync (struct mbox *m) {
     if (m->sync_pid > 0) {
         mlog(LOG_DEBUG,"'%s' sync command is still running\n", m->name);
         return;
@@ -544,11 +453,22 @@ void mbox_run_sync(struct mbox *m) {
     }
 }
 
-#define CHECK_FREE(ptr) \
+#define FREE_STR(ptr) \
     if (ptr != NULL) { \
         free(ptr); \
         ptr = NULL; \
     }
+
+#define FREE_STRV(strv) \
+do { \
+    char **tmp; \
+    if (strv) { \
+        for (tmp = strv; *tmp !=NULL; tmp++) { \
+            free(*tmp);\
+        } \
+        FREE_STR(strv); \
+    } \
+} while (0);
 
 /* Close connection to retry again */
 void mbox_free_conn(struct mbox *m) {
@@ -569,23 +489,17 @@ void mbox_free_conn(struct mbox *m) {
 }
 
 void mbox_free(struct mbox *m) {
-   char **tmp;
    mbox_free_conn(m);
 
-   CHECK_FREE(m->name);
-   CHECK_FREE(m->hostname);
-   CHECK_FREE(m->username);
-   CHECK_FREE(m->sync_cmd);
-   CHECK_FREE(m->password);
-   CHECK_FREE(m->pass_cmd);
-   CHECK_FREE(m->buf);
+   FREE_STR(m->name);
+   FREE_STR(m->hostname);
+   FREE_STR(m->username);
+   FREE_STR(m->sync_cmd);
+   FREE_STR(m->password);
+   FREE_STR(m->buf);
 
-   if (m->sync_args) {
-       for (tmp = m->sync_args; *tmp !=NULL; tmp++) {
-           free(*tmp);
-       }
-       CHECK_FREE(m->sync_args);
-   }
+   FREE_STRV(m->sync_args);
+   FREE_STRV(m->pass_args);
 
    free(m);
 }

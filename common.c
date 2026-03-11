@@ -30,7 +30,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <limits.h>
+#include <ctype.h>
 #include <assert.h>
+#include <libgen.h>
 
 #include "common.h"
 
@@ -92,7 +94,92 @@ char *get_conf_file_path(void) {
     return get_fpath (CONFIG_FNAME);
 }
 
-char *get_conf_fifo_path(void) {
-    return get_fpath (CONFIG_FIFO);
-}
+bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[]) {
+    char **args;
+    char *path, *sub, *brkb, *dirn, *basen;
+    char *tmp = NULL;
+    size_t cmd_len = 0;
+    int idx = 0;
+    int nargs = 0;
+    bool found_in_path = false;
+    bool ret = false;
 
+    /* at least /bin/1 */
+    if (strlen(val) < 6) {
+        mlog(LOG_ERR, "'%s' command is too short\n", mbox_name);
+        return false;
+    }
+
+    sub = val;
+    do {
+        if (!isspace(*sub) && !isalnum(*sub) && *sub != '/' && *sub != '-' && *sub != '\0') {
+            mlog(LOG_ERR, "'%s' Invalid character %c\n", mbox_name, *sub);
+            return false;
+        }
+    } while(*sub++);
+
+    sub = val;
+    while (!isspace(*sub++)) {cmd_len++;}
+    if (val[cmd_len - 1] == '/') {
+        mlog(LOG_ERR, "'%s' invalid slash terminated command '%s' \n", mbox_name, val);
+        return false;
+    }
+
+    path = strdup(getenv("PATH"));
+    tmp = strdup(val);
+    dirn = dirname(tmp);
+
+    if (strlen(dirn) > strlen(path)) {
+        mlog(LOG_ERR, "'%s' invalid command length '%s' \n", mbox_name, val);
+        goto out;
+    }
+
+    for (sub = strtok_r(path, ":", &brkb);
+         sub;
+         sub = strtok_r(NULL, ":", &brkb))
+    {
+        if (strcmp(sub, dirn) == 0) {
+            found_in_path = true;
+            break;
+        }
+    }
+    free(path);
+
+    if (!found_in_path) {
+        mlog(LOG_ERR, "'%s' command '%s' not found in $PATH\n",
+                      mbox_name, val);
+        goto out;
+    }
+
+    free(tmp);
+    tmp = strdup(val);
+    basen = basename(tmp);
+
+    if (basen[0] == '/' || basen[0] == '.' || basen[0] == '\\') {
+        mlog(LOG_ERR, "'%s' invalid command '%s' \n", mbox_name, val);
+        goto out;
+    }
+
+    sub = basen;
+
+    /* Parse arguments */
+    do {if (isspace(*sub)) nargs++;} while(*sub++);
+
+    args = malloc(sizeof(char *) * (nargs + 2));
+    for (sub = strtok_r(basen, " ", &brkb);
+         sub;
+         sub = strtok_r(NULL, " ", &brkb)) {
+        args[idx++] = strdup(sub);
+    }
+    args[idx] = NULL;
+
+    *cmd = malloc(cmd_len);
+    memset(*cmd, 0, cmd_len);
+    strncpy (*cmd, val, cmd_len);
+
+    *argv = args;
+    ret = true;
+out:
+    free(tmp);
+    return ret;
+}
