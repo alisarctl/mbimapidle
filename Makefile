@@ -11,7 +11,7 @@ LIBDIR=		${PREFIX}/lib
 SRCS= main.c mbox.c imap.c base64.c common.c
 
 CFLAGS+=       -I${.CURDIR} -Wall
-LDFLAGS+=      -lssl -lcrypto
+LDADD+=      -lssl -lcrypto
 
 .if defined(RC) && ${RC} == "openrc"
 RCDIR?=	/etc/user/init.d/

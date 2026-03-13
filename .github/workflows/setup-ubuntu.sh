@@ -3,6 +3,7 @@
 set -ex
 
 PACKAGES="
+  pkg-config
   libssl-dev
   bmake
 "
