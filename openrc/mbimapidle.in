@@ -1,0 +1,6 @@
+#!/sbin/openrc-run
+
+description="Execute command on IMAP mailbox changes"
+command="@BINDIR@/mbimapidle"
+supervisor=supervise-daemon
+

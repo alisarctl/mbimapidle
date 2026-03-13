@@ -21,13 +21,13 @@ $ make
 ## Linux (openrc) 
 ```
 $ bmake
-# bmake install PREFIX=/usr RC=openrc
+# bmake install PREFIX=/usr RC=openrc RCDIR=/etc/user/init.d/
 ```
 
 ## Linux (systemd)
 ```
 $ bmake
-# bmake install PREFIX=/usr RC=systemd
+# bmake install PREFIX=/usr RC=systemd RCDIR=/etc/systemd/user
 ```
 
 # Configuration file
@@ -42,7 +42,6 @@ which is normally located at
 ```
 ~/.config/mbimapidle/mbimapidlerc
 ```
-
 example
 
 ```mbimapidlerc
@@ -81,19 +80,11 @@ check_certificate="true"
 auth = "XOAUTH2"
 ```
 
-# User service file
+# User service file (openrc and systemd)
+
+Using user service file
 
 ## openrc
-
-/etc/user/init.d/mbimapidle
-
-```
-#!/sbin/openrc-run
-
-description="Execute command on IMAP mailbox changes"
-command="/usr/bin/mbimapidle"
-supervisor=supervise-daemon
-```
 
 ```
 $ rc-update -U add mbimapidle
@@ -101,7 +92,8 @@ $ rc-service -U mbimapidle start
 ```
 
 ## systemd
-TODO
+systemctl --user enable mbimapidle
+systemctl --user start mbimapidle
 
 # TODO
 * Buffer size adaptation
@@ -110,7 +102,8 @@ TODO
 * man page
 * complete command line arguments
 
-# DONE
+# Features
+* STARTTLS, TLS support
 * XOAUTH2 support
 * password command configuration
 * Plain communication
