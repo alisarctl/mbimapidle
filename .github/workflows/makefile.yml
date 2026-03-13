@@ -1,0 +1,25 @@
+name: Makefile CI
+
+on:
+  push:
+    branches: [ "testing", "main" ]
+  pull_request:
+    branches: [ "testing", "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository checkout
+        uses: actions/checkout@v4
+
+      - name: Ubuntu setup
+        run: /bin/sh -c "$GITHUB_WORKSPACE/.github/workflows/setup-ubuntu.sh"
+
+      - name: Compile
+        run: bmake
+
+      - name: install
+        run: sudo bmake RC=systemd PREFIX=/usr RCDIR=/etc/systemd/user install
