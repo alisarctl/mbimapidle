@@ -432,11 +432,21 @@ void mbox_foreach(mbox_conn func) {
 
 void mbox_remove_all(void) {
     struct mbox *m;
+
+#if defined(TAILQ_FOREACH_SAFE)
     struct mbox *tmp;
+
     TAILQ_FOREACH_SAFE(m, &mbox_head, mboxes, tmp) {
         TAILQ_REMOVE(&mbox_head, m, mboxes);
         mbox_free(m);
     }
+#else
+    while (!TAILQ_EMPTY(&mbox_head)) {
+        m = TAILQ_FIRST(&mbox_head);
+        TAILQ_REMOVE(&mbox_head, m, mboxes);
+        mbox_free(m);
+    }
+#endif
 }
 
 void mbox_run_sync (struct mbox *m) {
