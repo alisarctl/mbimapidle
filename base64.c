@@ -34,6 +34,8 @@
 #include <openssl/buffer.h>
 #include <stdint.h>
 
+#include "base64.h"
+
 char *b64_encode(const char *input, int *b64_len) {
     char *buff;
     BIO *bmem, *b64;
