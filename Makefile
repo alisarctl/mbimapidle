@@ -33,5 +33,8 @@ conf_install:
 
 install: conf_install
 
+clean:
+	rm -rf mk-cache
+
 help:
 	@echo "Targets are: all, install, clean, help"
