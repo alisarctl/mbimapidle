@@ -1,17 +1,15 @@
-MAKEOBJDIR=    obj
-
 PROG=          mbimapidle
-MAN=
 PREFIX?=	/usr/local
 LOCALBASE?=	/usr/local
 BINDIR=		${PREFIX}/bin
-MANDIR=		${PREFIX}/share/man/man
 LIBDIR=		${PREFIX}/lib
+
+MKC_REQUIRE_PKGCONFIG=libssl libcrypto
+MKC_CACHEDIR=mk-cache
 
 SRCS= main.c mbox.c imap.c base64.c common.c
 
-CFLAGS+=       -I${.CURDIR} -Wall
-LDADD+=      -lssl -lcrypto
+WARNS = 4
 
 .if defined(RC) && ${RC} == "openrc"
 RCDIR?=	/etc/user/init.d/
@@ -31,11 +29,9 @@ conf_install:
 	rm -f systemd/mbimapidle
 .endif
 
-CLEANFILES= ${GENSRCS}
+.include <mkc.prog.mk>
 
-.include <bsd.prog.mk>
-
-install: maninstall conf_install install_links _SUBDIRUSE
+install: conf_install
 
 help:
 	@echo "Targets are: all, install, clean, help"

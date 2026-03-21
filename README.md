@@ -9,25 +9,25 @@ when it receives notification from the imap server about new messages.
 **mbimapidle** requires **openssl** version 3 and above, it comes with a simple BSD
 style makefile (on Linux® often you just have to install bmake).
 
-1. BSD make
+1. mk-configure (Lightweight replacement for GNU autotools)
 2. openssl-3
 
 ## BSD
 ```
-$ make
-# make install PREFIX=/usr/local
+$ mkcmake
+# mkcmake install PREFIX=/usr/local
 ```
 
 ## Linux (openrc) 
 ```
-$ bmake
-# bmake install PREFIX=/usr RC=openrc RCDIR=/etc/user/init.d/
+$ mkcmake
+# mkcmake install PREFIX=/usr RC=openrc RCDIR=/etc/user/init.d/
 ```
 
 ## Linux (systemd)
 ```
-$ bmake
-# bmake install PREFIX=/usr RC=systemd RCDIR=/etc/systemd/user
+$ mkcmake
+# mkcmake install PREFIX=/usr RC=systemd RCDIR=/etc/systemd/user
 ```
 
 # Configuration file
