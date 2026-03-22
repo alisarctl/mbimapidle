@@ -40,148 +40,152 @@
 #define CONFIG_DNAME "mbimapidle"
 #define CONFIG_FIFO  "mbimapidle"
 
-static char *get_conf_dir_path(void) {
-    char *config_home;
-    char *tmp;
-    char *home = getenv("HOME");
-    char *p = NULL;
-    size_t config_path_len = 0;
+static char *get_conf_dir_path(void)
+{
+	char *config_home;
+	char *tmp;
+	char *home = getenv("HOME");
+	char *p = NULL;
+	size_t config_path_len = 0;
 
-    if (!home) {
-        mlog(LOG_ERR,"HOME env is not set aborting\n");
-        goto out;
-    }
+	if (!home) {
+		mlog(LOG_ERR,"HOME env is not set aborting\n");
+		goto out;
+	}
 
-    tmp = getenv("XDG_CONFIG_HOME");
+	tmp = getenv("XDG_CONFIG_HOME");
 
-    if(!tmp) {
-        mlog(LOG_INFO,"XDG_CONFIG_HOME not set, assuming ~/.config\n");
-        config_home = malloc(strlen(home) + strlen("/.config") + 1);
-        sprintf(config_home, "%s/.config", home);
-    } else {
-        config_home = strdup(tmp);
-    }
+	if(!tmp) {
+		mlog(LOG_INFO,"XDG_CONFIG_HOME not set, assuming ~/.config\n");
+		config_home = malloc(strlen(home) + strlen("/.config") + 1);
+		sprintf(config_home, "%s/.config", home);
+	} else {
+		config_home = strdup(tmp);
+	}
 
-    config_path_len = strlen(home) + strlen(config_home);
-    /* count also a '/' + '\0' */
-    config_path_len += strlen(CONFIG_DNAME) + 2;
+	config_path_len = strlen(home) + strlen(config_home);
+	/* count also a '/' + '\0' */
+	config_path_len += strlen(CONFIG_DNAME) + 2;
 
-    assert (config_path_len < PATH_MAX);
+	assert (config_path_len < PATH_MAX);
 
-    p = malloc(config_path_len);
+	p = malloc(config_path_len);
 
-    sprintf(p, "%s/%s", config_home, CONFIG_DNAME);
-    free(config_home);
+	sprintf(p, "%s/%s", config_home, CONFIG_DNAME);
+	free(config_home);
 out:
-    return p;
+	return p;
 }
 
-static char *get_fpath(const char *fname) {
-    char *conf_dir_path;
-    char *fp;
+static char *get_fpath(const char *fname)
+{
+	char *conf_dir_path;
+	char *fp;
 
-    conf_dir_path = get_conf_dir_path();
+	conf_dir_path = get_conf_dir_path();
 
-    assert (strlen(conf_dir_path) + strlen(fname) + 1 < PATH_MAX);
-    /* adding 2: slash + '\0' */
-    fp = malloc (strlen(conf_dir_path) + strlen(fname) + 2);
+	assert (strlen(conf_dir_path) + strlen(fname) + 1 < PATH_MAX);
+	/* adding 2: slash + '\0' */
+	fp = malloc (strlen(conf_dir_path) + strlen(fname) + 2);
 
-    sprintf(fp, "%s/%s", conf_dir_path, fname);
-    free(conf_dir_path);
-    return fp;
+	sprintf(fp, "%s/%s", conf_dir_path, fname);
+	free(conf_dir_path);
+	return fp;
 }
 
-char *get_conf_file_path(void) {
-    return get_fpath (CONFIG_FNAME);
+char *get_conf_file_path(void)
+{
+	return get_fpath (CONFIG_FNAME);
 }
 
-bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[]) {
-    char **args;
-    char *path, *sub, *brkb, *dirn, *basen;
-    char *tmp = NULL;
-    size_t cmd_len = 0;
-    int idx = 0;
-    int nargs = 0;
-    bool found_in_path = false;
-    bool ret = false;
+bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
+{
+	char **args;
+	char *path, *sub, *brkb, *dirn, *basen;
+	char *tmp = NULL;
+	size_t cmd_len = 0;
+	int idx = 0;
+	int nargs = 0;
+	bool found_in_path = false;
+	bool ret = false;
 
-    /* at least /bin/1 */
-    if (strlen(val) < 6) {
-        mlog(LOG_ERR, "'%s' command is too short\n", mbox_name);
-        return false;
-    }
+	/* at least /bin/1 */
+	if (strlen(val) < 6) {
+		mlog(LOG_ERR, "'%s' command is too short\n", mbox_name);
+		return false;
+	}
 
-    sub = val;
-    do {
-        if (!isspace(*sub) && !isalnum(*sub) && *sub != '/' && *sub != '-' && *sub != '\0' &&
-            *sub != '.') {
-            mlog(LOG_ERR, "'%s' Invalid character %c\n", mbox_name, *sub);
-            return false;
-        }
-    } while(*sub++);
+	sub = val;
+	do {
+		if (!isspace(*sub) && !isalnum(*sub) && *sub != '/' && *sub != '-' && *sub != '\0' &&
+				*sub != '.') {
+			mlog(LOG_ERR, "'%s' Invalid character %c\n", mbox_name, *sub);
+			return false;
+		}
+	} while(*sub++);
 
-    sub = val;
-    while (!isspace(*sub++)) {cmd_len++;}
-    if (val[cmd_len - 1] == '/') {
-        mlog(LOG_ERR, "'%s' invalid slash terminated command '%s' \n", mbox_name, val);
-        return false;
-    }
+	sub = val;
+	while (!isspace(*sub++)) {cmd_len++;}
+	if (val[cmd_len - 1] == '/') {
+		mlog(LOG_ERR, "'%s' invalid slash terminated command '%s' \n", mbox_name, val);
+		return false;
+	}
 
-    path = strdup(getenv("PATH"));
-    tmp = strdup(val);
-    dirn = dirname(tmp);
+	path = strdup(getenv("PATH"));
+	tmp = strdup(val);
+	dirn = dirname(tmp);
 
-    if (strlen(dirn) > strlen(path)) {
-        mlog(LOG_ERR, "'%s' invalid command length '%s' \n", mbox_name, val);
-        goto out;
-    }
+	if (strlen(dirn) > strlen(path)) {
+		mlog(LOG_ERR, "'%s' invalid command length '%s' \n", mbox_name, val);
+		goto out;
+	}
 
-    for (sub = strtok_r(path, ":", &brkb);
-         sub;
-         sub = strtok_r(NULL, ":", &brkb))
-    {
-        if (strcmp(sub, dirn) == 0) {
-            found_in_path = true;
-            break;
-        }
-    }
-    free(path);
+	for (sub = strtok_r(path, ":", &brkb);
+			sub;
+			sub = strtok_r(NULL, ":", &brkb))
+	{
+		if (strcmp(sub, dirn) == 0) {
+			found_in_path = true;
+			break;
+		}
+	}
+	free(path);
 
-    if (!found_in_path) {
-        mlog(LOG_ERR, "'%s' command '%s' not found in $PATH\n",
-                      mbox_name, val);
-        goto out;
-    }
+	if (!found_in_path) {
+		mlog(LOG_ERR, "'%s' command '%s' not found in $PATH\n",
+				mbox_name, val);
+		goto out;
+	}
 
-    free(tmp);
-    tmp = strdup(val);
-    basen = basename(tmp);
+	free(tmp);
+	tmp = strdup(val);
+	basen = basename(tmp);
 
-    if (basen[0] == '/' || basen[0] == '.' || basen[0] == '\\') {
-        mlog(LOG_ERR, "'%s' invalid command '%s' \n", mbox_name, val);
-        goto out;
-    }
+	if (basen[0] == '/' || basen[0] == '.' || basen[0] == '\\') {
+		mlog(LOG_ERR, "'%s' invalid command '%s' \n", mbox_name, val);
+		goto out;
+	}
 
-    sub = basen;
+	sub = basen;
 
-    /* Parse arguments */
-    do {if (isspace(*sub)) nargs++;} while(*sub++);
+	/* Parse arguments */
+	do {if (isspace(*sub)) nargs++;} while(*sub++);
 
-    args = malloc(sizeof(char *) * (nargs + 2));
-    for (sub = strtok_r(basen, " ", &brkb);
-         sub;
-         sub = strtok_r(NULL, " ", &brkb)) {
-        args[idx++] = strdup(sub);
-    }
-    args[idx] = NULL;
+	args = malloc(sizeof(char *) * (nargs + 2));
+	for (sub = strtok_r(basen, " ", &brkb);
+			sub;
+			sub = strtok_r(NULL, " ", &brkb)) {
+		args[idx++] = strdup(sub);
+	}
+	args[idx] = NULL;
 
-    *cmd = malloc(cmd_len);
-    memset(*cmd, 0, cmd_len);
-    strncpy (*cmd, val, cmd_len);
+	*cmd = malloc(cmd_len);
+	memset(*cmd, 0, cmd_len);
+	strncpy (*cmd, val, cmd_len);
 
-    *argv = args;
-    ret = true;
+	*argv = args;
+	ret = true;
 out:
-    free(tmp);
-    return ret;
+	free(tmp);
+	return ret;
 }

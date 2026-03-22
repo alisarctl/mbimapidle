@@ -42,77 +42,77 @@
 #include <openssl/ssl.h>
 
 enum {
-    MBOX_INIT_CONNECT = 0,
-    MBOX_WANT_PASS,
-    MBOX_TRY_CONNECT,
-    MBOX_GET_SRV_CAPS,
-    MBOX_CHECK_SRV_CAPS,
-    MBOX_AUTHENTICATE,
-    MBOX_CHECK_LOGIN,
-    MBOX_CONNECT_STARTTLS,
-    MBOX_CONNECT_TLS,
-    MBOX_TLS_HANDSHAKE,
-    MBOX_TLS_GET_SRV_CAPS,
-    MBOX_STARTTLS_OFFER,
-    MBOX_STARTTLS_HANDSHAKE,
-    MBOX_SELECT,
-    MBOX_CHECK_SELECT,
-    MBOX_SEND_IDLE,
-    MBOX_CHECK_IDLE,
-    MBOX_CHECK_DONE,
-    MBOX_IDLE,
-    MBOX_DISABLED,
-    MBOX_INVALID
+	MBOX_INIT_CONNECT = 0,
+	MBOX_WANT_PASS,
+	MBOX_TRY_CONNECT,
+	MBOX_GET_SRV_CAPS,
+	MBOX_CHECK_SRV_CAPS,
+	MBOX_AUTHENTICATE,
+	MBOX_CHECK_LOGIN,
+	MBOX_CONNECT_STARTTLS,
+	MBOX_CONNECT_TLS,
+	MBOX_TLS_HANDSHAKE,
+	MBOX_TLS_GET_SRV_CAPS,
+	MBOX_STARTTLS_OFFER,
+	MBOX_STARTTLS_HANDSHAKE,
+	MBOX_SELECT,
+	MBOX_CHECK_SELECT,
+	MBOX_SEND_IDLE,
+	MBOX_CHECK_IDLE,
+	MBOX_CHECK_DONE,
+	MBOX_IDLE,
+	MBOX_DISABLED,
+	MBOX_INVALID
 };
 
 enum {
-    TLS_TYPE_INVALID = 0,
-    TLS_TYPE_NONE,
-    TLS_TYPE_STARTTLS,
-    TLS_TYPE_SSL
+	TLS_TYPE_INVALID = 0,
+	TLS_TYPE_NONE,
+	TLS_TYPE_STARTTLS,
+	TLS_TYPE_SSL
 };
 
 enum {
-    AUTH_TYPE_INVALID = 0,
-    AUTH_TYPE_PLAIN,
-    AUTH_TYPE_XOAUTH2
+	AUTH_TYPE_INVALID = 0,
+	AUTH_TYPE_PLAIN,
+	AUTH_TYPE_XOAUTH2
 };
 
 struct mbox {
-    /* Loaded from configuration */
-    char     *name;
-    char     *hostname;
-    char     *username;
-    char     *password;
-    char     *pass_cmd;
-    char    **pass_args;
-    char     *sync_cmd;       /* Command to run on new emails */
-    char    **sync_args;
-    uint32_t  idle_timeout;
-    uint16_t  port;
-    uint8_t   tls_type;
-    uint8_t   auth_type;
-    bool      check_cert;
-    /* End of loaded from conf fields */
-    int       sock;
-    char     *buf;
-    size_t    buf_size;
-    size_t    buf_len;
-    int       state;
-    int       old_state;       /* Save old state to check if we are stuck */
-    uint32_t  nfails;          /* Number of times we got some failures */
-    uint32_t  state_timeout;   /* Single state timeout, not applicable to MBOX_IDLE */
-    pid_t     sync_pid;        /* pid of the sync command */
-    pid_t     pass_pid;        /* pid of pass command */
-    int       pass_pipe_fd;    /* child pipe fd to read password from */
-    uint32_t  re_idle_in;      /* DONE -> IDLE Sequence in ms time */
-    uint32_t  delay;           /* Delay in ms to re-connect or to next action */
-    uint32_t  caps;
-    uint32_t  tag;
-    struct sockaddr_in servaddr;
-    SSL      *ssl;
-    BIO      *bio;
-    TAILQ_ENTRY(mbox) mboxes;
+	/* Loaded from configuration */
+	char     *name;
+	char     *hostname;
+	char     *username;
+	char     *password;
+	char     *pass_cmd;
+	char    **pass_args;
+	char     *sync_cmd;       /* Command to run on new emails */
+	char    **sync_args;
+	uint32_t  idle_timeout;
+	uint16_t  port;
+	uint8_t   tls_type;
+	uint8_t   auth_type;
+	bool      check_cert;
+	/* End of loaded from conf fields */
+	int       sock;
+	char     *buf;
+	size_t    buf_size;
+	size_t    buf_len;
+	int       state;
+	int       old_state;       /* Save old state to check if we are stuck */
+	uint32_t  nfails;          /* Number of times we got some failures */
+	uint32_t  state_timeout;   /* Single state timeout, not applicable to MBOX_IDLE */
+	pid_t     sync_pid;        /* pid of the sync command */
+	pid_t     pass_pid;        /* pid of pass command */
+	int       pass_pipe_fd;    /* child pipe fd to read password from */
+	uint32_t  re_idle_in;      /* DONE -> IDLE Sequence in ms time */
+	uint32_t  delay;           /* Delay in ms to re-connect or to next action */
+	uint32_t  caps;
+	uint32_t  tag;
+	struct sockaddr_in servaddr;
+	SSL      *ssl;
+	BIO      *bio;
+	TAILQ_ENTRY(mbox) mboxes;
 };
 
 #define CAPS_IDLE         (1 << 0)

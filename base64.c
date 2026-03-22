@@ -36,52 +36,54 @@
 
 #include "base64.h"
 
-char *b64_encode(const char *input, int *b64_len) {
-    char *buff;
-    BIO *bmem, *b64;
-    BUF_MEM *bptr;
+char *b64_encode(const char *input, int *b64_len)
+{
+	char *buff;
+	BIO *bmem, *b64;
+	BUF_MEM *bptr;
 
-    b64 = BIO_new(BIO_f_base64());
-    BIO_set_close(b64, BIO_CLOSE);
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+	b64 = BIO_new(BIO_f_base64());
+	BIO_set_close(b64, BIO_CLOSE);
+	BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
 
-    bmem = BIO_new(BIO_s_mem());
-    bmem = BIO_push(b64, bmem);
+	bmem = BIO_new(BIO_s_mem());
+	bmem = BIO_push(b64, bmem);
 
-    BIO_write(b64, input, strlen(input));
-    BIO_flush(b64);
+	BIO_write(b64, input, strlen(input));
+	BIO_flush(b64);
 
-    BIO_get_mem_ptr(b64, &bptr);
+	BIO_get_mem_ptr(b64, &bptr);
 
-    buff = (char *)malloc(bptr->length);
-    memcpy(buff, bptr->data, bptr->length);
-    buff[bptr->length] = 0;
+	buff = (char *)malloc(bptr->length);
+	memcpy(buff, bptr->data, bptr->length);
+	buff[bptr->length] = 0;
 
-    *b64_len = bptr->length;
+	*b64_len = bptr->length;
 
-    BIO_free_all(bmem);
+	BIO_free_all(bmem);
 
-    return buff;
+	return buff;
 }
 
-char *b64_decode(const char *input, int b64_len) {
-    char *buff;
-    BIO *bmem, *b64;
+char *b64_decode(const char *input, int b64_len)
+{
+	char *buff;
+	BIO *bmem, *b64;
 
-    buff = (char *)malloc(b64_len);
-    memset(buff, 0, b64_len);
+	buff = (char *)malloc(b64_len);
+	memset(buff, 0, b64_len);
 
-    b64 = BIO_new(BIO_f_base64());
-    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
-    bmem = BIO_new(BIO_s_mem());
-    bmem = BIO_push(b64, bmem);
+	b64 = BIO_new(BIO_f_base64());
+	BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+	bmem = BIO_new(BIO_s_mem());
+	bmem = BIO_push(b64, bmem);
 
-    BIO_write(bmem, input, b64_len);
-    BIO_flush(bmem);
-    BIO_read(b64, (void*)buff, b64_len);
+	BIO_write(bmem, input, b64_len);
+	BIO_flush(bmem);
+	BIO_read(b64, (void*)buff, b64_len);
 
-    BIO_free_all(b64);
+	BIO_free_all(b64);
 
-    return buff;
+	return buff;
 }
 

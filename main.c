@@ -50,16 +50,16 @@
 #include "common.h"
 
 enum {
-    ARG_HELP,
-    ARG_VERSION,
-    ARG_DEBUG
+	ARG_HELP,
+	ARG_VERSION,
+	ARG_DEBUG
 };
 
 static struct option opts[] = {
-    { "help", no_argument, 0, ARG_HELP},
-    { "version", no_argument, 0, ARG_VERSION },
-    { "debug", no_argument, 0, ARG_DEBUG },
-    {NULL, 0, NULL, 0}
+	{ "help", no_argument, 0, ARG_HELP},
+	{ "version", no_argument, 0, ARG_VERSION },
+	{ "debug", no_argument, 0, ARG_DEBUG },
+	{NULL, 0, NULL, 0}
 };
 
 /* extern variables */
@@ -72,186 +72,190 @@ static volatile bool reload_all = false;
 int log_to_syslog = 0;
 bool debug = false;
 
-static void sig_handler(int signum) {
-
-    if (signum == SIGHUP) {
-        if (reload_all || countdown_reload != 0) {
-            mlog(LOG_INFO, "Daemon is starting up or reloading, ignoring SIGHUP\n");
-        } else {
-            reload_all = true;
-            countdown_reload = SEC_MS(10);
-        }
-    } else
-        main_loop_running = 0;
+static void sig_handler(int signum)
+{
+	if (signum == SIGHUP) {
+		if (reload_all || countdown_reload != 0) {
+			mlog(LOG_INFO, "Daemon is starting up or reloading, ignoring SIGHUP\n");
+		} else {
+			reload_all = true;
+			countdown_reload = SEC_MS(10);
+		}
+	} else
+		main_loop_running = 0;
 }
 
 #define MAX_PASS_TOKEN_LEN 8192
-static void mbox_proc(struct mbox*m) {
-    if (m->state == MBOX_DISABLED)
-        return;
+static void mbox_proc(struct mbox*m)
+{
+	if (m->state == MBOX_DISABLED)
+		return;
 
-    COUNTDOWN(m->delay, 0);
-    if (m->delay != 0) return;
+	COUNTDOWN(m->delay, 0);
+	if (m->delay != 0) return;
 
-    if (m->sync_pid > 0) {
-        int status = 0;
-        if (waitpid(m->sync_pid, &status, WNOHANG) == m->sync_pid) {
-            m->sync_pid = 0;
-        }
-    }
+	if (m->sync_pid > 0) {
+		int status = 0;
+		if (waitpid(m->sync_pid, &status, WNOHANG) == m->sync_pid) {
+			m->sync_pid = 0;
+		}
+	}
 
-    if (m->pass_pid > 0) {
-        int status = 0;
-        if (waitpid(m->pass_pid, &status, WNOHANG) == m->pass_pid) {
-            ssize_t nbytes = 0;
-            size_t rc = 0;
+	if (m->pass_pid > 0) {
+		int status = 0;
+		if (waitpid(m->pass_pid, &status, WNOHANG) == m->pass_pid) {
+			ssize_t nbytes = 0;
+			size_t rc = 0;
 
-            ioctl(m->pass_pipe_fd, FIONREAD, &nbytes);
+			ioctl(m->pass_pipe_fd, FIONREAD, &nbytes);
 
-            if (nbytes > MAX_PASS_TOKEN_LEN - 1) {
-                mlog(LOG_ERR, "'%s' password token is too long\n", m->name);
-                goto disable;
-            }
-            FREE_STR(m->password);
-            m->password = malloc(nbytes + 1);
-            memset (m->password, 0, nbytes + 1);
+			if (nbytes > MAX_PASS_TOKEN_LEN - 1) {
+				mlog(LOG_ERR, "'%s' password token is too long\n", m->name);
+				goto disable;
+			}
+			FREE_STR(m->password);
+			m->password = malloc(nbytes + 1);
+			memset (m->password, 0, nbytes + 1);
 
-            do {
-                rc += read(m->pass_pipe_fd, m->password + rc, nbytes - rc);
-                if (rc == -1) {
-                    mlog(LOG_ERR, "unexpected end of read '%s'\n", strerror(errno));
-                    goto disable;
-                }
-            } while (rc != nbytes);
+			do {
+				rc += read(m->pass_pipe_fd, m->password + rc, nbytes - rc);
+				if (rc == -1) {
+					mlog(LOG_ERR, "unexpected end of read '%s'\n", strerror(errno));
+					goto disable;
+				}
+			} while (rc != nbytes);
 
-            m->state = MBOX_INIT_CONNECT;
-            goto out;
+			m->state = MBOX_INIT_CONNECT;
+			goto out;
 
 disable:
-            m->state = MBOX_DISABLED;
+			m->state = MBOX_DISABLED;
 out:
-            m->pass_pid = 0;
-            close(m->pass_pipe_fd);
-        }
+			m->pass_pid = 0;
+			close(m->pass_pipe_fd);
+		}
 
-    }
-    mbox_idle_proc(m);
+	}
+	mbox_idle_proc(m);
 }
 
-static void mbox_check_state (struct mbox *m) {
-    if (m->state == MBOX_DISABLED)
-        return;
+static void mbox_check_state (struct mbox *m)
+{
+	if (m->state == MBOX_DISABLED)
+		return;
 
-    if (m->old_state != m->state) {
-        m->state_timeout = SEC_MS(10);
-        m->old_state = m->state;
-    } else {
-        COUNTDOWN(m->state_timeout, 0);
-        /* Error switching state */
-        if (m->state != MBOX_IDLE && m->state != MBOX_INIT_CONNECT && m->state_timeout == 0) {
-            mlog(LOG_INFO, "'%s' connection seems to be stuck, re-trying\n", m->name);
+	if (m->old_state != m->state) {
+		m->state_timeout = SEC_MS(10);
+		m->old_state = m->state;
+	} else {
+		COUNTDOWN(m->state_timeout, 0);
+		/* Error switching state */
+		if (m->state != MBOX_IDLE &&
+		    m->state != MBOX_INIT_CONNECT &&
+		    m->state_timeout == 0) {
+			mlog(LOG_INFO, "'%s' connection seems to be stuck, re-trying\n", m->name);
 
-            if (m->pass_pid) {
-                kill(m->pass_pid, SIGKILL);
-                close(m->pass_pipe_fd);
-                m->pass_pipe_fd = 0;
-            }
+			if (m->pass_pid) {
+				kill(m->pass_pid, SIGKILL);
+				close(m->pass_pipe_fd);
+				m->pass_pipe_fd = 0;
+			}
 
-            mbox_free_conn(m);
+			mbox_free_conn(m);
 
-            m->state = MBOX_INIT_CONNECT;
-            m->state_timeout = SEC_MS(10);
-        }
-    }
+			m->state = MBOX_INIT_CONNECT;
+			m->state_timeout = SEC_MS(10);
+		}
+	}
 }
 
 int main(int argc, char *argv[])
 {
-    int ch;
-    struct sigaction sa;
-    int ret = EXIT_FAILURE;
+	int ch;
+	struct sigaction sa;
+	int ret = EXIT_FAILURE;
 
-    while ((ch = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
-        switch(ch) {
-            case ARG_HELP:
-                printf("help\n");
-                return EXIT_SUCCESS;
-                break;
-            case ARG_VERSION:
-                printf("version\n");
-                return EXIT_SUCCESS;
-                break;
-            case ARG_DEBUG:
-                debug = true;
-                break;
-            case '?':
-            default:
-                printf("Unknown command\n");
-                return EXIT_FAILURE;
-        }
-    }
+	while ((ch = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
+		switch(ch) {
+			case ARG_HELP:
+				printf("help\n");
+				return EXIT_SUCCESS;
+				break;
+			case ARG_VERSION:
+				printf("version\n");
+				return EXIT_SUCCESS;
+				break;
+			case ARG_DEBUG:
+				debug = true;
+				break;
+			case '?':
+			default:
+				printf("Unknown command\n");
+				return EXIT_FAILURE;
+		}
+	}
 
-    openlog("mbimapidle", LOG_PID, LOG_DAEMON);
+	openlog("mbimapidle", LOG_PID, LOG_DAEMON);
 
-    if (!conf_init()) {
-        mlog(LOG_ERR, "Failed to load configuration\n");
-        goto failure_config;
-    }
+	if (!conf_init()) {
+		mlog(LOG_ERR, "Failed to load configuration\n");
+		goto failure_config;
+	}
 
-    if (!mbox_init_ssl()) {
-        goto failure_ssl;
-    }
+	if (!mbox_init_ssl()) {
+		goto failure_ssl;
+	}
 
-    memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = sig_handler;
+	memset(&sa, 0, sizeof(sa));
+	sa.sa_handler = sig_handler;
 
-    if (sigaction(SIGINT, &sa, NULL) == -1)
-        mlog(LOG_ERR, "Failed to set SIGINT action\n");
+	if (sigaction(SIGINT, &sa, NULL) == -1)
+		mlog(LOG_ERR, "Failed to set SIGINT action\n");
 
-    if (sigaction(SIGTERM, &sa, NULL) == -1)
-        mlog(LOG_ERR, "Failed to set SIGTERM action\n");
+	if (sigaction(SIGTERM, &sa, NULL) == -1)
+		mlog(LOG_ERR, "Failed to set SIGTERM action\n");
 
-    if (sigaction(SIGHUP, &sa, NULL) == -1)
-        mlog(LOG_ERR, "Failed to set SIGTERM action\n");
+	if (sigaction(SIGHUP, &sa, NULL) == -1)
+		mlog(LOG_ERR, "Failed to set SIGTERM action\n");
 
 
-    while (main_loop_running) {
-        /* Reload configuration on SIGHUP */
-        COUNTDOWN(countdown_reload, 0);
-        if (reload_all) {
+	while (main_loop_running) {
+		/* Reload configuration on SIGHUP */
+		COUNTDOWN(countdown_reload, 0);
+		if (reload_all) {
 
-            mlog(LOG_INFO, "Reloading configuration\n");
-            mbox_foreach(&mbox_shutdown_ssl);
-            mbox_remove_all();
+			mlog(LOG_INFO, "Reloading configuration\n");
+			mbox_foreach(&mbox_shutdown_ssl);
+			mbox_remove_all();
 
-            if (!conf_init()) {
-                mlog(LOG_ERR, "Failed to load configuration\n");
-                mlog(LOG_INFO, "Please fix configuration and reload with SIGHUP\n");
-                mbox_remove_all();
-                /* Accept SIGHUP for reloading without delays */
-                countdown_reload = 0;
-            }
-            reload_all = false;
-        }
+			if (!conf_init()) {
+				mlog(LOG_ERR, "Failed to load configuration\n");
+				mlog(LOG_INFO, "Please fix configuration and reload with SIGHUP\n");
+				mbox_remove_all();
+				/* Accept SIGHUP for reloading without delays */
+				countdown_reload = 0;
+			}
+			reload_all = false;
+		}
 
-        /* Process messages/connections/etc.*/
-        mbox_foreach(&mbox_proc);
+		/* Process messages/connections/etc.*/
+		mbox_foreach(&mbox_proc);
 
-        /* Check mbox state */
-        mbox_foreach(&mbox_check_state);
+		/* Check mbox state */
+		mbox_foreach(&mbox_check_state);
 
-        tick_wait();
-    }
+		tick_wait();
+	}
 
-    mlog(LOG_INFO, "Exiting gracefully");
+	mlog(LOG_INFO, "Exiting gracefully");
 
-    ret = EXIT_SUCCESS;
+	ret = EXIT_SUCCESS;
 
-    mbox_free_ssl();
+	mbox_free_ssl();
 failure_ssl:
-    mbox_foreach(&mbox_shutdown_ssl);
+	mbox_foreach(&mbox_shutdown_ssl);
 failure_config:
-    mbox_remove_all();
+	mbox_remove_all();
 
-    return ret;
+	return ret;
 }

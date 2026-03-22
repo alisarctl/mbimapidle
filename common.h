@@ -54,81 +54,82 @@ extern bool debug;
 
 static inline void mlog (int level, const char *format, ...)
 {
-    va_list args;
+	va_list args;
 
-    if (!debug && (level == LOG_DEBUG))
-        return;
+	if (!debug && (level == LOG_DEBUG))
+		return;
 
-    va_start (args, format);
+	va_start (args, format);
 
-    if (log_to_syslog) {
-        vsyslog(level, format, args);
-    } else {
-        time_t t = time(NULL);
-        char *c = ctime(&t);
-        switch(level) {
-            case LOG_DEBUG:
-                 printf("Debug: ");
-                 break;
-            case LOG_ERR:
-                 printf("ERR:   ");
-                 break;
-            case LOG_WARNING:
-                 printf("Warn:  ");
-                 break;
-            case LOG_INFO:
-                 printf("Info:  ");
-                 break;
-            default:
-                 printf("       ");
-                 break;
-        }
-        printf("[");
-        do {
-            printf("%c", *c++);
-        } while(*c != '\n' && *c != '\0');
-        printf("] ");
-        vprintf(format, args);
-    }
-    va_end(args);
+	if (log_to_syslog) {
+		vsyslog(level, format, args);
+	} else {
+		time_t t = time(NULL);
+		char *c = ctime(&t);
+		switch(level) {
+			case LOG_DEBUG:
+				printf("Debug: ");
+				break;
+			case LOG_ERR:
+				printf("ERR:   ");
+				break;
+			case LOG_WARNING:
+				printf("Warn:  ");
+				break;
+			case LOG_INFO:
+				printf("Info:  ");
+				break;
+			default:
+				printf("       ");
+				break;
+		}
+		printf("[");
+		do {
+			printf("%c", *c++);
+		} while(*c != '\n' && *c != '\0');
+		printf("] ");
+		vprintf(format, args);
+	}
+	va_end(args);
 }
 
-static inline void tick_wait(void) {
-    struct timespec ts;
-    ts.tv_sec = TICK_MS / 1000;
-    ts.tv_nsec = (TICK_MS % 1000) * 1000000;
-    nanosleep(&ts, &ts);
+static inline void tick_wait(void)
+{
+	struct timespec ts;
+	ts.tv_sec = TICK_MS / 1000;
+	ts.tv_nsec = (TICK_MS % 1000) * 1000000;
+	nanosleep(&ts, &ts);
 }
 
 char *get_conf_file_path (void);
 
 bool  parse_cmd          (const char *mbox_name,
-                          char *val,
-                          char **cmd,
-                          char **argv[]);
+		char *val,
+		char **cmd,
+		char **argv[]);
 
 #define FREE_STR(ptr) \
-do  { \
-    if (ptr != NULL) { \
-        free(ptr); \
-        ptr = NULL; \
-    } \
-} while (0);
+	do  { \
+		if (ptr != NULL) { \
+			free(ptr); \
+			ptr = NULL; \
+		} \
+	} while (0);
 
 #define FREE_STRV(strv) \
-do { \
-    char **tmp; \
-    if (strv) { \
-        for (tmp = strv; *tmp !=NULL; tmp++) { \
-            free(*tmp);\
-        } \
-        FREE_STR(strv); \
-    } \
-} while (0);
+	do { \
+		char **tmp; \
+		if (strv) { \
+			for (tmp = strv; *tmp !=NULL; tmp++) { \
+				free(*tmp);\
+			} \
+			FREE_STR(strv); \
+		} \
+	} while (0);
 
 #define assert_not_reached() do { \
-    mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); \
-    exit(EXIT_FAILURE); \
+	mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); \
+	exit(EXIT_FAILURE); \
 } while (0);
 
 #endif
