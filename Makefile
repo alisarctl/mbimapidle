@@ -34,7 +34,7 @@ conf_install:
 install: conf_install
 
 clean:
-	rm -rf mk-cache
+	rm -rf ${MKC_CACHEDIR} ${CLEANFILES}
 
 help:
 	@echo "Targets are: all, install, clean, help"
