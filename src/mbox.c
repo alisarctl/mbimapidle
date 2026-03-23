@@ -470,8 +470,15 @@ void mbox_remove_all(void)
 
 void mbox_run_sync (struct mbox *m)
 {
+	int fd[2];
+
 	if (m->sync_pid > 0) {
 		mlog(LOG_DEBUG,"'%s' sync command is still running\n", m->name);
+		return;
+	}
+
+	if (!foreground && pipe(fd) < 0 ) {
+		mlog(LOG_ERR, "'%s' pipe error '%s'", m->name, strerror(errno));
 		return;
 	}
 
@@ -481,11 +488,25 @@ void mbox_run_sync (struct mbox *m)
 	}
 
 	if (m->sync_pid == 0) {
-		int ret = execvp(m->sync_cmd, m->sync_args);
+		int ret;
+
+		if (!foreground) {
+			/* Redirect stderr to stdout */
+			dup2(STDOUT_FILENO, STDERR_FILENO);
+			dup2(fd[1], STDOUT_FILENO);
+			close(fd[0]);
+		}
+
+		ret = execvp(m->sync_cmd, m->sync_args);
+
 		if (ret == -1) {
-			mlog(LOG_ERR, "'%s' Failed to run sync command '%s':'%s'\n", m->name, m->sync_cmd, strerror(errno));
+			mlog(LOG_ERR, "'%s' Failed to run sync command '%s':'%s'\n",
+			     m->name, m->sync_cmd, strerror(errno));
 			exit(-1);
 		}
+	} else if (!foreground) {
+		close(fd[1]);
+		m->sync_cmd_stdout = fd[0];
 	}
 }
 
@@ -512,8 +533,10 @@ void mbox_get_pass (struct mbox *m)
 
 	if (m->pass_pid == 0) {
 		int ret;
+
+		dup2(STDOUT_FILENO, STDERR_FILENO);
+		dup2(fd[1], STDOUT_FILENO);
 		close(fd[0]);
-		dup2(fd[1], 1);
 
 		ret = execvp(m->pass_cmd, m->pass_args);
 		if (ret == -1) {

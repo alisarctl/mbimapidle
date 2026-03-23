@@ -105,6 +105,7 @@ struct mbox {
 	pid_t     sync_pid;        /* pid of the sync command */
 	pid_t     pass_pid;        /* pid of pass command */
 	int       pass_pipe_fd;    /* child pipe fd to read password from */
+	int       sync_cmd_stdout; /* Sync command standard output */
 	uint32_t  re_idle_in;      /* DONE -> IDLE Sequence in ms time */
 	uint32_t  delay;           /* Delay in ms to re-connect or to next action */
 	uint32_t  caps;

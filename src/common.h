@@ -42,9 +42,21 @@
 
 #define COUNTDOWN(_val,_reset) _val = _val == 0 ? _reset : _val <= TICK_MS ? 0 : _val - TICK_MS
 
+#ifdef MIN
+#undef MIN
+#endif
+
+#ifdef MAX
+#undef MAX
+#endif
+
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
 extern volatile int main_loop_running;
-extern int log_to_syslog;
+extern bool log_to_syslog;
 extern bool debug;
+extern bool foreground;
 
 #ifdef LOG_WARN
 #undef LOG_WARN
@@ -77,6 +89,7 @@ static inline void mlog (int level, const char *format, ...)
 				printf("Warn:  ");
 				break;
 			case LOG_INFO:
+			case LOG_NOTICE:
 				printf("Info:  ");
 				break;
 			default:

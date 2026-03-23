@@ -71,7 +71,7 @@ volatile int main_loop_running = 1;
 static int countdown_reload = SEC_MS(10);
 static volatile bool reload_all = false;
 
-int log_to_syslog = 0;
+bool log_to_syslog = false;
 bool debug = false;
 bool foreground = false;
 
@@ -110,8 +110,25 @@ static void mbox_proc(struct mbox*m)
 
 	if (m->sync_pid > 0) {
 		int status = 0;
+		mlog(LOG_DEBUG, "'%s' Checking sync command'\n", m->name);
 		if (waitpid(m->sync_pid, &status, WNOHANG) == m->sync_pid) {
 			m->sync_pid = 0;
+			/* FIXME: Mayne an option to print sync command output */
+			if (!foreground && debug) {
+				ssize_t nbytes = 0;
+				size_t rc = 0;
+				char msg[256];
+
+				ioctl(m->sync_cmd_stdout, FIONREAD, &nbytes);
+
+				do {
+					memset(msg, 0, sizeof(msg));
+					rc += read(m->sync_cmd_stdout, msg, MIN(nbytes - rc, 255));
+					mlog(LOG_DEBUG, "'%s' '%s'\n", m->name, msg);
+				} while (rc < nbytes);
+
+				close(m->sync_cmd_stdout);
+			}
 		}
 	}
 
@@ -145,6 +162,7 @@ static void mbox_proc(struct mbox*m)
 disable:
 			m->state = MBOX_DISABLED;
 out:
+			mlog(LOG_DEBUG, "'%s' Got password '%s'\n", m->name, m->password);
 			m->pass_pid = 0;
 			close(m->pass_pipe_fd);
 		}
@@ -218,7 +236,7 @@ int main(int argc, char *argv[])
 
 	if (!foreground) {
 		openlog("mbimapidle", LOG_PID, LOG_DAEMON);
-		log_to_syslog = 1;
+		log_to_syslog = true;
 	}
 
 	if (!conf_init()) {

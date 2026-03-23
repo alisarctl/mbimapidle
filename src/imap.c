@@ -558,8 +558,8 @@ static bool mbox_authenticate(struct mbox *m)
 
 		b64 = b64_encode(xoauth, &b64_len);
 
-		/* tag length + auth message + \r \n */
-		msg_len = strlen(IMAP_TAG_STR IMAP_XOAUTH2_AUTH) + 1;
+		/* tag length + auth message + \r\n\0 */
+		msg_len = strlen(IMAP_TAG_STR IMAP_XOAUTH2_AUTH) + 3;
 		msg_len += b64_len;
 		msg = malloc(msg_len);
 
@@ -633,13 +633,11 @@ static bool mbox_read_ssl(struct mbox *m, bool block)
 		}
 		return false;
 	}
-	mlog(LOG_ERR, "'%s' Error retry connect eof:%d\n", m->name, eof);
-	return !eof;
 
 end:
-	ERR_print_errors_fp(stderr);
-	mlog(LOG_ERR, "'%s' X Error retry connect eof:%d\n", m->name, eof);
+	mlog(LOG_ERR, "'%s' Error retrying connection eof:%d\n", m->name, eof);
 	handle_failure(m);
+	ERR_print_errors_fp(stderr);
 	return false;
 }
 
@@ -827,7 +825,7 @@ void mbox_idle_proc(struct mbox *m)
 			RESET_BUFFER(m);
 			break;
 		case MBOX_CHECK_LOGIN:
-			mlog(LOG_DEBUG, "'%s' checking login result\n", m->name);
+			mlog(LOG_DEBUG, "'%s' checking login result '%s'\n", m->name, m->buf);
 			if (mbox_read(m, false)) {
 				if (imap_check_answer(m)) {
 					if (imap_check_login(m)) {
@@ -889,6 +887,8 @@ void mbox_idle_proc(struct mbox *m)
 		case MBOX_IDLE:
 			if (mbox_read(m, false)) {
 				if (!imap_is_keep_alive(m)) {
+					/* FIXME, check if we have new messages */
+					mlog(LOG_DEBUG, "'%s' Server notification '%s'\n", m->name, m->buf);
 					mlog(LOG_DEBUG, "'%s' Running sync command\n", m->name);
 					mbox_run_sync(m);
 				}

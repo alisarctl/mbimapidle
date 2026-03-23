@@ -97,7 +97,6 @@ systemctl --user start mbimapidle
 
 # TODO
 * Buffer size adaptation
-* Redirect sync command output to logs
 * man page
 * complete command line arguments
 
