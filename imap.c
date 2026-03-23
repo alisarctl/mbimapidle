@@ -55,6 +55,7 @@ static SSL_CTX *ssl_ctx = NULL;
 
 #define IMAP_TAG     "A%010d "
 #define IMAP_TAG_STR "AXXXXXXXXXX "
+#define IMAP_TAG_STR_LEN 12
 #define IMAP_PLAIN_LOGIN "LOGIN "
 #define IMAP_XOAUTH2_AUTH "AUTHENTICATE XOAUTH2 "
 #define BEARER_AUTH_STR "user=\001auth=Bearer \001\001"
@@ -76,12 +77,13 @@ static inline void handle_failure(struct mbox *m)
 	m->state_timeout = SEC_MS(20);
 }
 
-static bool imap_check_tag(struct mbox *m)
+static bool imap_check_answer(struct mbox *m)
 {
-	char msg_tag[12];
+	/* include "OK" + '\0' */
+	char msg_tag[IMAP_TAG_STR_LEN + 3];
 
 	memset (msg_tag, 0, sizeof(msg_tag));
-	sprintf(msg_tag, "A%010d", m->tag);
+	sprintf(msg_tag, "A%010d OK", m->tag);
 
 	return strstr(m->buf, msg_tag) != NULL;
 }
@@ -787,8 +789,14 @@ void mbox_idle_proc(struct mbox *m)
 			break;
 		case MBOX_STARTTLS_OFFER:
 			if (mbox_read_socket(m, false)) {
-				/* FIXME, check STARTTLS OFFER */
-				m->state = MBOX_STARTTLS_HANDSHAKE;
+				if (imap_check_answer(m)){
+					m->state = MBOX_STARTTLS_HANDSHAKE;
+				} else {
+					mlog(LOG_ERR,
+					     "'%s' unexpected starttls answer from server \n",
+					     m->name);
+					handle_failure(m);
+				}
 			}
 			break;
 		case MBOX_STARTTLS_HANDSHAKE:
@@ -821,7 +829,7 @@ void mbox_idle_proc(struct mbox *m)
 		case MBOX_CHECK_LOGIN:
 			mlog(LOG_DEBUG, "'%s' checking login result\n", m->name);
 			if (mbox_read(m, false)) {
-				if (imap_check_tag(m)) {
+				if (imap_check_answer(m)) {
 					if (imap_check_login(m)) {
 						mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
 						m->state = MBOX_SELECT;
@@ -849,7 +857,7 @@ void mbox_idle_proc(struct mbox *m)
 		case MBOX_CHECK_SELECT:
 			mlog(LOG_DEBUG, "'%s' checking select result\n", m->name);
 			if (mbox_read(m, false)) {
-				if (imap_check_tag(m)) {
+				if (imap_check_answer(m)) {
 					if (imap_check_select(m)) {
 						m->state = MBOX_SEND_IDLE;
 					} else {
