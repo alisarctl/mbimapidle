@@ -53,6 +53,12 @@ extern volatile int main_loop_running;
 static SSL_CTX *ssl_ctx = NULL;
 #define RESET_BUFFER(m) memset(m->buf, 0, m->buf_size); m->buf_len = 0;
 
+#define IMAP_TAG     "A%010d "
+#define IMAP_TAG_STR "AXXXXXXXXXX "
+#define IMAP_PLAIN_LOGIN "LOGIN "
+#define IMAP_XOAUTH2_AUTH "AUTHENTICATE XOAUTH2 "
+#define BEARER_AUTH_STR "user=\001auth=Bearer \001\001"
+
 static inline void handle_failure(struct mbox *m)
 {
 	uint32_t delay;
@@ -518,32 +524,41 @@ static bool mbox_authenticate(struct mbox *m)
 	int b64_len = 0;
 
 	if (m->auth_type == AUTH_TYPE_PLAIN) {
-		msg_len = strlen(m->username) + strlen(m->password) + 25;
+		/* AXXXXXXXXXX LOGIN "USER" "PASS"\r\n\0' */
+		/* add length for \r\n\0' */
+		msg_len  = strlen(IMAP_TAG_STR IMAP_PLAIN_LOGIN) + 3;
+
+		/* add 4 for quotes and 1 for space between user and pass */
+		msg_len += strlen(m->username) + strlen(m->password) + 5;
 		msg = malloc(msg_len);
 
 		memset(msg, 0, msg_len);
-		sprintf(msg, "A%010d LOGIN \"%s\" \"%s\"\r\n",
+		snprintf(msg, msg_len, "A%010d LOGIN \"%s\" \"%s\"\r\n",
 				++m->tag, m->username, m->password);
+
 	} else if (m->auth_type == AUTH_TYPE_XOAUTH2) {
-		xoauth_len = strlen(m->username) + strlen(m->password) + 24;
+		/* add length for \r\n\0' */
+		xoauth_len = strlen(BEARER_AUTH_STR) + 3;
+		xoauth_len += strlen(m->username) + strlen(m->password);
 
 		xoauth = malloc(xoauth_len);
 		memset(xoauth, 0, xoauth_len);
 
-		sprintf(xoauth, "user=%s\001auth=Bearer %s\001\001",
-				m->username, m->password);
+		snprintf(xoauth, xoauth_len, "user=%s\001auth=Bearer %s\001\001",
+			 m->username, m->password);
 
 		b64 = b64_encode(xoauth, &b64_len);
 
 		/* tag length + auth message + \r \n */
-		msg_len = b64_len + 36;
+		msg_len = strlen(IMAP_TAG_STR IMAP_XOAUTH2_AUTH) + 1;
+		msg_len += b64_len;
 		msg = malloc(msg_len);
 
 		memset(msg, 0, msg_len);
 
-		sprintf(msg, "A%010d AUTHENTICATE XOAUTH2 %s\r\n", ++m->tag, b64);
-		free(xoauth);
-		free(b64);
+		snprintf(msg, msg_len, "A%010d AUTHENTICATE XOAUTH2 %s\r\n", ++m->tag, b64);
+		FREE_STR(xoauth);
+		FREE_STR(b64);
 	} else
 		assert_not_reached();
 
@@ -555,7 +570,7 @@ static bool mbox_authenticate(struct mbox *m)
 
 	if (!ret)
 		mlog(LOG_ERR, "'%s' Failed to send login message\n", m->name);
-	free(msg);
+	FREE_STR(msg);
 	return ret;
 }
 
