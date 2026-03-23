@@ -295,6 +295,11 @@ static void check_srv_caps (struct mbox *m)
 		goto out;
 	}
 
+	if (!(m->caps & CAPS_IDLE)) {
+		mlog(LOG_INFO, "'%s' Server doesn't support IMAP IDLE, disabling\n", m->name);
+		goto disable;
+	}
+
 	if (!(m->caps & CAPS_AUTH_PLAIN)) {
 		mlog(LOG_INFO, "'%s' Server doesn't support AUTH:PLAIN, don't know how to authenticate, disabling\n", m->name);
 		goto disable;
@@ -325,7 +330,6 @@ static void check_srv_caps (struct mbox *m)
 		assert_not_reached();
 
 	return;
-	/* FIXME, checl CAPABILITY */
 out:
 	mlog(LOG_ERR, "'%s' Unexpected capability message from server, disabling %s\n", m->buf, m->name);
 disable:

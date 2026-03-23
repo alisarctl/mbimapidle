@@ -31,6 +31,12 @@
 
 #include "mbox.h"
 
+#define CAPS_IDLE         (1 << 0)
+#define CAPS_STARTTLS     (1 << 2)
+#define CAPS_AUTH_PLAIN   (1 << 3)
+#define CAPS_AUTH_XOAUTH2 (1 << 4)
+#define CAPS_READY        (1 << 5)
+
 void mbox_idle_proc(struct mbox *m);
 bool mbox_init_ssl(void);
 void mbox_shutdown_ssl(struct mbox *m);
