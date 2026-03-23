@@ -98,7 +98,6 @@ systemctl --user start mbimapidle
 # TODO
 * Buffer size adaptation
 * Redirect sync command output to logs
-* Fix "FIXMEs"
 * man page
 * complete command line arguments
 

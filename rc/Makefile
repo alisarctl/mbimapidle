@@ -1,3 +1,4 @@
-SUBDIR= src rc man
+SUBDIR= openrc systemd
 
 .include <mkc.subdir.mk>
+

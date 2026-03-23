@@ -18,8 +18,18 @@ jobs:
       - name: Ubuntu setup
         run: /bin/sh -c "$GITHUB_WORKSPACE/.github/workflows/setup-ubuntu.sh"
 
+      - name: Compiler settings
+        run: mkc_compiler_settings
+
       - name: Compile
-        run: mkc_compiler_settings; mkcmake
+        run: mkcmake
 
       - name: install
         run: mkcmake RC=systemd PREFIX=${PWD}/usr RCDIR=${PWD}/etc/systemd/user install
+
+      - name: install-systemd
+        run: mkcmake RC=systemd PREFIX=${PWD}/usr RCDIR=${PWD}/etc/systemd/user install
+
+      - name: install-openrc
+        run: mkcmake RC=openrc PREFIX=${PWD}/usr RCDIR=${PWD}/etc/user/init.d install
+

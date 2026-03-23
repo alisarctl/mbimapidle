@@ -1,0 +1,18 @@
+.\" Written by Ali Abdallah (ali.abdallah@suse.com)
+.\" ------------------------------------------------------------------
+.TH mbimapidle 1 "@DATE@" "mbimapidle (@VERSION@)" "User Commands"
+.SH NAME
+mbimapidle \- Maintain persistent server connection using IMAP protocol (RFC 2177) IDLE extension and execute sync command on new messages.
+.SH SYNOPSIS
+.B "mbimapidle"
+.br
+.SH DESCRIPTION
+.B mbimapidle
+.SH "CONFIGURATION FILE"
+.TP
+The configuration file should be located at
+
+.I $XDG_CONFIG_DIR/mbimapidle/mbimapidlerc
+
+.SH AUTHOR
+Ali Abdallah (ali.abdallah@suse.com)
