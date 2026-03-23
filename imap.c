@@ -487,12 +487,15 @@ static bool mbox_write_ssl (struct mbox *m, char *msg)
 {
 	size_t written = 0;
 
-	while (main_loop_running && !SSL_write_ex(m->ssl, msg, strlen(msg), &written)) {
+	while (!SSL_write_ex(m->ssl, msg, strlen(msg), &written)) {
+		if (!main_loop_running)
+			goto end;
+
 		if (handle_io_failure(m, 0) == 1)
-			continue; /* Retry */
-		/* FIXME */
+			continue;
 		mlog(LOG_ERR, "'%s' Failed to perform command\n", m->name);
-		goto end; /* Cannot retry: error */
+
+		goto end;
 	}
 
 	return true;
