@@ -5,7 +5,7 @@ set -ex
 PACKAGES="
   pkg-config
   libssl-dev
-  bmake
+  mk-configure
 "
 
 sudo -E apt-get -y install $PACKAGES

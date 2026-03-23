@@ -19,7 +19,7 @@ jobs:
         run: /bin/sh -c "$GITHUB_WORKSPACE/.github/workflows/setup-ubuntu.sh"
 
       - name: Compile
-        run: bmake
+        run: mkc_compiler_settings; mkcmake
 
       - name: install
-        run: sudo bmake RC=systemd PREFIX=/usr RCDIR=/etc/systemd/user install
+        run: sudo mkcmake RC=systemd PREFIX=/usr RCDIR=/etc/systemd/user install
