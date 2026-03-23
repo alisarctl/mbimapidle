@@ -109,6 +109,11 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 	bool found_in_path = false;
 	bool ret = false;
 
+	path = getenv("PATH");
+	if (path == NULL) {
+		mlog(LOG_ERR, "PATH is not set\n");
+		return false;
+	}
 	/* at least /bin/1 */
 	if (strlen(val) < 6) {
 		mlog(LOG_ERR, "'%s' command is too short\n", mbox_name);
@@ -131,12 +136,13 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 		return false;
 	}
 
-	path = strdup(getenv("PATH"));
+	path = strdup(path);
 	tmp = strdup(val);
 	dirn = dirname(tmp);
 
 	if (strlen(dirn) > strlen(path)) {
 		mlog(LOG_ERR, "'%s' invalid command length '%s' \n", mbox_name, val);
+		FREE_STR(path);
 		goto out;
 	}
 
@@ -149,7 +155,7 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 			break;
 		}
 	}
-	free(path);
+	FREE_STR(path);
 
 	if (!found_in_path) {
 		mlog(LOG_ERR, "'%s' command '%s' not found in $PATH\n",
@@ -157,7 +163,7 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 		goto out;
 	}
 
-	free(tmp);
+	FREE_STR(tmp);
 	tmp = strdup(val);
 	basen = basename(tmp);
 
@@ -186,6 +192,6 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 	*argv = args;
 	ret = true;
 out:
-	free(tmp);
+	FREE_STR(tmp);
 	return ret;
 }
