@@ -179,8 +179,8 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 	}
 	args[idx] = NULL;
 
-	*cmd = malloc(cmd_len);
-	memset(*cmd, 0, cmd_len);
+	*cmd = malloc(cmd_len + 1);
+	memset(*cmd, 0, cmd_len + 1);
 	strncpy (*cmd, val, cmd_len);
 
 	*argv = args;

@@ -111,7 +111,7 @@ static bool check_key_value(char *line, char **key, char **val)
 	strncpy(*val, line + quote1_pos + 1, quote2_pos - quote1_pos - 1);
 
 	*key = malloc(key_len + 1);
-	memset(*key, 0, key_len);
+	memset(*key, 0, key_len + 1);
 	strncpy(*key, line, key_len);
 
 	*key = trim(*key);
@@ -288,7 +288,7 @@ static bool check_mbox_fields(struct mbox *m)
 	return true;
 }
 
-bool conf_init()
+bool conf_init(void)
 {
 	FILE *config;
 	ssize_t rc;

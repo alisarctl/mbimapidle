@@ -123,7 +123,7 @@ struct mbox {
 
 typedef void (*mbox_conn) (struct mbox *mbox);
 
-bool conf_init();
+bool conf_init(void);
 void mbox_foreach(mbox_conn func);
 void mbox_remove_all(void);
 void mbox_run_sync(struct mbox *m);
