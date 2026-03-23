@@ -11,6 +11,8 @@ MKC_CACHEDIR=mk-cache
 SRCS= main.c mbox.c imap.c base64.c common.c
 
 WARNS = 4
+CFLAGS   +=     -DPROG='"${PROG}"'
+CFLAGS   +=     -DVERSION='"${PROG_VERSION}"'
 
 .include <mkc.prog.mk>
 

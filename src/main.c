@@ -52,13 +52,15 @@
 enum {
 	ARG_HELP,
 	ARG_VERSION,
+	ARG_FOREGROUND,
 	ARG_DEBUG
 };
 
 static struct option opts[] = {
-	{ "help", no_argument, 0, ARG_HELP},
-	{ "version", no_argument, 0, ARG_VERSION },
-	{ "debug", no_argument, 0, ARG_DEBUG },
+	{ "help",		no_argument, 0, ARG_HELP},
+	{ "version",		no_argument, 0, ARG_VERSION },
+	{ "foreground",		no_argument, 0, ARG_FOREGROUND},
+	{ "debug",		no_argument, 0, ARG_DEBUG },
 	{NULL, 0, NULL, 0}
 };
 
@@ -71,6 +73,18 @@ static volatile bool reload_all = false;
 
 int log_to_syslog = 0;
 bool debug = false;
+bool foreground = false;
+
+static void show_help(void)
+{
+	printf ("%s [options]\n\n"
+		"COMMANDS:\n"
+		"	-h, --help			Show this help\n"
+		"	-v, --version			Show version\n\n"
+		"OPTIONS:\n"
+		"	--foreground			Run in the foreground\n\n",
+		PROG);
+}
 
 static void sig_handler(int signum)
 {
@@ -172,22 +186,29 @@ static void mbox_check_state (struct mbox *m)
 int main(int argc, char *argv[])
 {
 	int ch;
+	pid_t daemon;
 	struct sigaction sa;
 	int ret = EXIT_FAILURE;
 
 	while ((ch = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
 		switch(ch) {
+			case 'h':
 			case ARG_HELP:
-				printf("help\n");
+				show_help();
 				return EXIT_SUCCESS;
-				break;
+
 			case ARG_VERSION:
-				printf("version\n");
+				printf("%s: %s\n", PROG, VERSION);
 				return EXIT_SUCCESS;
+
+			case ARG_FOREGROUND:
+				foreground = true;
 				break;
+
 			case ARG_DEBUG:
 				debug = true;
 				break;
+
 			case '?':
 			default:
 				printf("Unknown command\n");
@@ -195,7 +216,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	openlog("mbimapidle", LOG_PID, LOG_DAEMON);
+	if (!foreground) {
+		openlog("mbimapidle", LOG_PID, LOG_DAEMON);
+		log_to_syslog = 1;
+	}
 
 	if (!conf_init()) {
 		mlog(LOG_ERR, "Failed to load configuration\n");
@@ -204,6 +228,16 @@ int main(int argc, char *argv[])
 
 	if (!mbox_init_ssl()) {
 		goto failure_ssl;
+	}
+
+	if (!foreground) {
+		if ((daemon = fork()) == -1) {
+			mlog(LOG_ERR, "Failed to fork to run in the background\n");
+		} else if (daemon != 0) {
+			return EXIT_SUCCESS;
+		} else {
+			mlog(LOG_INFO, PROG ": daemon started\n");
+		}
 	}
 
 	memset(&sa, 0, sizeof(sa));
