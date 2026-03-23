@@ -107,7 +107,7 @@ static bool check_key_value(char *line, char **key, char **val)
 	assert(quote2_pos > quote1_pos - 1);
 
 	*val = malloc(quote2_pos - quote1_pos + 1);
-	memset (*val, 0, quote2_pos - quote1_pos);
+	memset (*val, 0, quote2_pos - quote1_pos + 1);
 	strncpy(*val, line + quote1_pos + 1, quote2_pos - quote1_pos - 1);
 
 	*key = malloc(key_len + 1);
@@ -309,14 +309,11 @@ bool conf_init(void)
 	if (!p) return false;
 
 	config = fopen(p, "r");
-
+	FREE_STR(p);
 	if (!config) {
 		mlog(LOG_ERR,"Failed to load configuration file '%s'\n", strerror(errno));
 		return false;
 	}
-
-	if (p) free(p);
-	p = NULL;
 
 	in_general = false;
 	in_block = false;
@@ -328,7 +325,10 @@ bool conf_init(void)
 		idx = 0;
 		p = malloc(rc);
 		memset(p, 0, rc);
-		if (rc == 1 && line[0] == '\n') continue;
+		if (rc == 1 && line[0] == '\n') {
+			FREE_STR(p);
+			continue;
+		}
 
 		/* Skip leading whitespaces */
 		while (line[idx] == ' ') {
@@ -336,7 +336,10 @@ bool conf_init(void)
 		}
 
 		/* Line is a comment, skip it*/
-		if (line[idx] == '#') continue;
+		if (line[idx] == '#') {
+			FREE_STR(p);
+			continue;
+		}
 
 		do {
 			if (line[idx] != '\n' && line[idx] != '\0') {
@@ -358,6 +361,7 @@ bool conf_init(void)
 			}
 			in_general = true; in_block = false;
 			general_found = true;
+			FREE_STR(p);
 			continue;
 			/* Opening of a mbox block */
 		} else if (p[0] == '[') {
@@ -378,6 +382,7 @@ bool conf_init(void)
 
 			in_block = true; in_general = false;
 			TAILQ_INSERT_HEAD(&mbox_head, m, mboxes);
+			FREE_STR(p);
 			continue;
 		}
 
@@ -390,12 +395,20 @@ bool conf_init(void)
 			goto error_syntax;
 		}
 
-		if (in_general && !validate_general_config(key, val))
+		/* key and val are allocated by check_key_value */
+		if (in_general && !validate_general_config(key, val)) {
+			FREE_STR(key);
+			FREE_STR(val);
 			goto error_syntax;
-		if (in_block && !validate_block_config(m, key, val))
+		}
+		if (in_block && !validate_block_config(m, key, val)) {
+			FREE_STR(key);
+			FREE_STR(val);
 			goto error_syntax;
-		free(p);
-		p = NULL;
+		}
+		FREE_STR(key);
+		FREE_STR(val);
+		FREE_STR(p);
 	}
 
 	TAILQ_FOREACH(m, &mbox_head, mboxes) {
@@ -415,12 +428,14 @@ bool conf_init(void)
 	}
 
 	fclose(config);
+	FREE_STR(line);
 	return true;
 error_syntax:
+	FREE_STR(p);
 	mlog(LOG_ERR, "Syntax error near '%s' line %d\n", p, linenum);
 error_config:
-	if (p != NULL) free(p);
 	fclose(config);
+	free(line);
 
 	return false;
 }
