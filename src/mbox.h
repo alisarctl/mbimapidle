@@ -41,6 +41,9 @@
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 
+/* Read buffer default size and also the value to use when resizing */
+#define BUFFER_CHUNK_SIZE (1024)
+
 enum {
 	MBOX_INIT_CONNECT = 0,
 	MBOX_WANT_PASS,

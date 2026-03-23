@@ -417,7 +417,7 @@ bool conf_init(void)
 			mlog(LOG_ERR,"Incomplete configuration for mbox '%s'\n", m->name);
 			goto error_config;
 		}
-		m->buf_size = 1024;
+		m->buf_size = BUFFER_CHUNK_SIZE;
 		m->buf = malloc(m->buf_size);
 		mlog(LOG_INFO, "'%s' configuration loaded\n", m->name);
 	}

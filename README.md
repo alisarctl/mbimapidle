@@ -96,8 +96,7 @@ systemctl --user enable mbimapidle
 systemctl --user start mbimapidle
 
 # TODO
-* Buffer size adaptation
-* man page
+* man pages
 * complete command line arguments
 
 # Features

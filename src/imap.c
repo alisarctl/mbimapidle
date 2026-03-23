@@ -125,14 +125,12 @@ static void imap_decode64(struct mbox *m)
 {
 	char *tmp;
 
-	printf("String to decode %s\n", m->buf);
 	tmp = b64_decode(m->buf + 2, m->buf_len);
 	RESET_BUFFER(m);
 
 	m->buf_len = strlen(tmp);
 	strncpy(m->buf, tmp, m->buf_len);
 
-	printf("Decoded string '%s'\n", m->buf);
 	free(tmp);
 }
 
@@ -245,7 +243,20 @@ static bool mbox_read_socket (struct mbox *m, bool block)
 
 	idx = m->buf_len;
 
+	assert(m->buf_size >= m->buf_len);
+
 	while(main_loop_running) {
+		if (m->buf_size == m->buf_len) {
+			/* Reached buf size limit, reallocating */
+			m->buf = realloc(m->buf, BUFFER_CHUNK_SIZE);
+			if (!m->buf) {
+				mlog(LOG_ERR,
+					"'%s' Buffer reallocation failed, out-of-memory\n",
+					m->name);
+				return false;
+			}
+			m->buf_size += BUFFER_CHUNK_SIZE;
+		}
 		rc = recv(m->sock, m->buf + idx, m->buf_size - m->buf_len, MSG_DONTWAIT);
 		if (rc == -1) {
 			if (errno == EAGAIN) {
@@ -610,8 +621,25 @@ end:
 static bool mbox_read_ssl(struct mbox *m, bool block)
 {
 	int eof = 0;
+	size_t rc = 0;
 
-	while (main_loop_running && !eof && !SSL_read_ex(m->ssl, m->buf, m->buf_size, &m->buf_len)) {
+	assert(m->buf_size >= m->buf_len);
+
+	/* Reached buf size limit, reallocating */
+	if (m->buf_size == m->buf_len) {
+		m->buf = realloc(m->buf, BUFFER_CHUNK_SIZE);
+		if (!m->buf) {
+			mlog(LOG_ERR,
+			     "'%s' Buffer reallocation failed, out-of-memory\n",
+			     m->name);
+			return false;
+		}
+		m->buf_size += BUFFER_CHUNK_SIZE;
+	}
+
+	while (main_loop_running &&
+		!eof &&
+		!SSL_read_ex(m->ssl, m->buf + m->buf_len, m->buf_size - m->buf_len, &rc)) {
 		switch (handle_io_failure(m, 0)) {
 			case 1:
 				if (!block) {return false;}
@@ -627,6 +655,7 @@ static bool mbox_read_ssl(struct mbox *m, bool block)
 	}
 
 	if (!eof) {
+		m->buf_len += rc;
 		if (m->buf[m->buf_len - 1] == '\n' && m->buf[m->buf_len - 2] == '\r') {
 			m->buf[m->buf_len - 2] = '\0';
 			return true;
