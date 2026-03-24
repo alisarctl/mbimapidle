@@ -54,7 +54,7 @@ char *b64_encode(const char *input, int *b64_len)
 
 	BIO_get_mem_ptr(b64, &bptr);
 
-	buff = (char *)malloc(bptr->length);
+	buff = (char *)malloc(bptr->length + 1);
 	memcpy(buff, bptr->data, bptr->length);
 	buff[bptr->length] = 0;
 
@@ -70,8 +70,8 @@ char *b64_decode(const char *input, int b64_len)
 	char *buff;
 	BIO *bmem, *b64;
 
-	buff = (char *)malloc(b64_len);
-	memset(buff, 0, b64_len);
+	buff = (char *)malloc(b64_len + 1);
+	memset(buff, 0, b64_len + 1);
 
 	b64 = BIO_new(BIO_f_base64());
 	BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);

@@ -130,7 +130,10 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 	} while(*sub++);
 
 	sub = val;
-	while (!isspace(*sub++)) {cmd_len++;}
+	do {
+		cmd_len++;
+	} while(*sub++ && !isspace(*sub));
+
 	if (val[cmd_len - 1] == '/') {
 		mlog(LOG_ERR, "'%s' invalid slash terminated command '%s' \n", mbox_name, val);
 		return false;
@@ -187,7 +190,7 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 
 	*cmd = malloc(cmd_len + 1);
 	memset(*cmd, 0, cmd_len + 1);
-	strncpy (*cmd, val, cmd_len);
+	memcpy(*cmd, val, cmd_len);
 
 	*argv = args;
 	ret = true;

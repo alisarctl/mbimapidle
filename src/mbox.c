@@ -431,8 +431,8 @@ bool conf_init(void)
 	FREE_STR(line);
 	return true;
 error_syntax:
-	FREE_STR(p);
 	mlog(LOG_ERR, "Syntax error near '%s' line %d\n", p, linenum);
+	FREE_STR(p);
 error_config:
 	fclose(config);
 	free(line);
@@ -580,6 +580,7 @@ void mbox_free(struct mbox *m)
 	FREE_STR(m->username);
 	FREE_STR(m->sync_cmd);
 	FREE_STR(m->password);
+	FREE_STR(m->pass_cmd);
 	FREE_STR(m->buf);
 
 	FREE_STRV(m->sync_args);
