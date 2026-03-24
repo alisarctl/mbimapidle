@@ -6,10 +6,11 @@ when it receives notification from the imap server about new messages.
 
 # Requirements & Installation
 
-**mbimapidle** requires **openssl** version 3 and above, it comes with a simple BSD
-style makefile (on Linux® often you just have to install bmake).
+**mbimapidle** only requires **openssl** version 3 and above, and it uses
+[mk-configure](https://github.com/cheusov/mk-configure) for its build system,
+a Lightweight and easy to deploy replacement for GNU autotools.
 
-1. mk-configure (Lightweight replacement for GNU autotools)
+1. mk-configure
 2. openssl-3
 
 ## BSD
