@@ -80,9 +80,10 @@ static void show_help(void)
 	printf ("%s [options]\n\n"
 		"COMMANDS:\n"
 		"	-h, --help			Show this help\n"
-		"	-v, --version			Show version\n\n"
+		"	-v, --version			Show version\n"
+		"	-d, --debug			Print debugging messages (default: disabled)\n"
 		"OPTIONS:\n"
-		"	--foreground			Run in the foreground\n\n",
+		"	-f, --foreground		Run in the foreground (default: run in the background)\n\n",
 		PROG);
 }
 
@@ -112,7 +113,7 @@ static void mbox_proc(struct mbox*m)
 		int status = 0;
 		if (waitpid(m->sync_pid, &status, WNOHANG) == m->sync_pid) {
 			m->sync_pid = 0;
-			/* FIXME: Mayne an option to print sync command output */
+			/* FIXME: Maybe an option to print sync command output */
 			if (!foreground && debug) {
 				ssize_t nbytes = 0;
 				size_t rc = 0;
@@ -228,14 +229,17 @@ int main(int argc, char *argv[])
 				show_help();
 				return EXIT_SUCCESS;
 
+			case 'v':
 			case ARG_VERSION:
 				printf("%s: %s\n", PROG, VERSION);
 				return EXIT_SUCCESS;
 
+			case 'f':
 			case ARG_FOREGROUND:
 				foreground = true;
 				break;
 
+			case 'd':
 			case ARG_DEBUG:
 				debug = true;
 				break;
