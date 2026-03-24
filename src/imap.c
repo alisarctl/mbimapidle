@@ -854,22 +854,21 @@ void mbox_idle_proc(struct mbox *m)
 			RESET_BUFFER(m);
 			break;
 		case MBOX_CHECK_LOGIN:
-			mlog(LOG_DEBUG, "'%s' checking login result '%s'\n", m->name, m->buf);
 			if (mbox_read(m, false)) {
-				if (imap_check_answer(m)) {
-					if (imap_check_login(m)) {
-						mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
-						m->state = MBOX_SELECT;
-						m->nfails = 0;
-						RESET_BUFFER(m);
-					} else {
-						mlog(LOG_DEBUG,"'%s' login failed\n", m->name);
-						handle_failure(m);
-					}
+				mlog(LOG_DEBUG, "'%s' checking login result '%s'\n", m->name, m->buf);
+				if (imap_check_answer(m) && imap_check_login(m)) {
+					mlog(LOG_DEBUG,"'%s' login okay\n", m->name);
+					m->state = MBOX_SELECT;
+					m->nfails = 0;
+					RESET_BUFFER(m);
 				} else if (m->auth_type == AUTH_TYPE_XOAUTH2 && imap_is_sasl_challenge(m)) {
 					imap_decode64(m);
 					mlog(LOG_DEBUG, "'%s' AUTH FAILED '%s'\n", m->name, m->buf);
 					mbox_send_empty(m);
+					RESET_BUFFER(m);
+					m->state = MBOX_DISABLED;
+				} else {
+					mlog(LOG_DEBUG,"'%s' login failed\n", m->name);
 					RESET_BUFFER(m);
 					m->state = MBOX_DISABLED;
 				}
@@ -884,13 +883,11 @@ void mbox_idle_proc(struct mbox *m)
 		case MBOX_CHECK_SELECT:
 			mlog(LOG_DEBUG, "'%s' checking select result\n", m->name);
 			if (mbox_read(m, false)) {
-				if (imap_check_answer(m)) {
-					if (imap_check_select(m)) {
+				if (imap_check_answer(m) && imap_check_select(m)) {
 						m->state = MBOX_SEND_IDLE;
-					} else {
-						mlog(LOG_DEBUG, "'%s' Failed to select INBOX (got %s)\n", m->name, m->buf);
-						handle_failure(m);
-					}
+				} else {
+					mlog(LOG_DEBUG, "'%s' Failed to select INBOX (got %s)\n", m->name, m->buf);
+					handle_failure(m);
 				}
 			}
 			break;
