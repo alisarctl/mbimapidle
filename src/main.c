@@ -110,7 +110,6 @@ static void mbox_proc(struct mbox*m)
 
 	if (m->sync_pid > 0) {
 		int status = 0;
-		mlog(LOG_DEBUG, "'%s' Checking sync command'\n", m->name);
 		if (waitpid(m->sync_pid, &status, WNOHANG) == m->sync_pid) {
 			m->sync_pid = 0;
 			/* FIXME: Mayne an option to print sync command output */
@@ -124,11 +123,13 @@ static void mbox_proc(struct mbox*m)
 				do {
 					memset(msg, 0, sizeof(msg));
 					rc += read(m->sync_cmd_stdout, msg, MIN(nbytes - rc, 255));
-					mlog(LOG_DEBUG, "'%s' '%s'\n", m->name, msg);
+					mlog(LOG_DEBUG, "Sync: '%s' '%s'\n", m->name, msg);
 				} while (rc < nbytes);
 
 				close(m->sync_cmd_stdout);
 			}
+			mlog(LOG_DEBUG, "'%s' Sync done with exit code %d:%s\n",
+				m->name, status, status == 0 ? "SUCCESS" : "FAILURE");
 		}
 	}
 

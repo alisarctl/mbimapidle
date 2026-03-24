@@ -476,6 +476,7 @@ void mbox_run_sync (struct mbox *m)
 		mlog(LOG_DEBUG,"'%s' sync command is still running\n", m->name);
 		return;
 	}
+	mlog(LOG_DEBUG,"'%s' executing sync command\n", m->name);
 
 	if (!foreground && pipe(fd) < 0 ) {
 		mlog(LOG_ERR, "'%s' pipe error '%s'", m->name, strerror(errno));
