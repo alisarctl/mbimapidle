@@ -1,18 +1,61 @@
 .\" Written by Ali Abdallah (ali.abdallah@suse.com)
 .\" ------------------------------------------------------------------
 .TH mbimapidle 1 "@DATE@" "mbimapidle (@VERSION@)" "User Commands"
-.SH NAME
-mbimapidle \- Maintain persistent server connection using IMAP protocol (RFC 2177) IDLE extension and execute sync command on new messages.
-.SH SYNOPSIS
-.B "mbimapidle"
-.br
-.SH DESCRIPTION
-.B mbimapidle
-.SH "CONFIGURATION FILE"
-.TP
-The configuration file should be located at
 
-.I $XDG_CONFIG_DIR/mbimapidle/mbimapidlerc
+.SH NAME
+mbimapidle \- execute command on new IMAP messages
+.SH SYNOPSIS
+
+\fBmbimapidle\fR [\fIoptions\fR]
+.br
+.
+
+.SH DESCRIPTION
+.P
+\fBmbimapidle\fR maintains persistent server connection using IMAP protocol (RFC
+2177) IDLE extension and execute sync command on new messages.
+.
+
+.SH OPTIONS
+.TP
+.TP
+\fB-h\fR, \fB--help\fR
+Display a summary of command line options.
+.TP
+\fB-v\fR, \fB--version\fR
+Display version information.
+.TP
+\fB-d\fR, \fB--debug\fR
+Print debugging messages (default: disabled)
+.TP
+\fB-f\fR, \fB--foreground\fR
+Run in the foreground instead of forking into a background process (default:
+run the background)
+.
+
+.SH "CONFIGURATION"
+The configuration file is mandatory and should be located at
+.TP
+\fB$XDG_CONFIG_HOME/mbimapidle/mbimapidlerc\fR (usually \fB~/.config/mbimapidle/mbimapidlerc\fR)
+.TP
+.P
+Lines starting with (#) are comments and are ignored. Configuration file is
+defined in sections, an optional [general] section and [MailBoxName] section
+defining a mailbox to monitor, you can add as much [MailBoxName] as you like.
+.
+.SS General section [general]
+This is an optional section currently controls only daemon verbosity
+.TP
+\fBverbose\fR=\fI"value"\fR 
+set value to \fBtrue\fR to enabled verbosity, default value \fBfalse\fR.  Note
+if verbosity is set to \fBfalse\fR, and \fBmbimapidle\fR is run with \fB-d\fR,
+\fB--debug\fR you will still get verbose messages.
+.SS Mail box section [MailBoxName]
+
+For a sample configuration file, please checkout out:
+.TP
+\fB@CONF_EXAMPLE@\fR
+.
 
 .SH AUTHOR
 Ali Abdallah (ali.abdallah@suse.com)

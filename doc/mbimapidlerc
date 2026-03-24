@@ -1,0 +1,34 @@
+[general]
+verbose="true"
+
+[mbox1]
+hostname = "hostname1"
+password  =  "pass1" # Comment
+username = "user1"
+sync_cmd = "/usr/bin/mbsync -a"
+idle_timeout = "10"
+check_certificate="false"
+port = "993"
+tls_type="ssl"
+auth = "plain"
+
+[mbox2]
+hostname = "hostname2"
+password  =  "pass2" # Comment
+username = "user2"
+sync_cmd = "/usr/bin/mbsync -a"
+idle_timeout = "20"
+check_certificate="false"
+port = "143"
+tls_type = "starttls"
+auth = "plain"
+
+[gmail]
+hostname = "imap.gmail.com"
+pass_cmd  =  "/home/user/bin/renew-token"
+username = "user2"
+sync_cmd = "/usr/bin/mbsync -a"
+port = "993"
+check_certificate="true"
+auth = "XOAUTH2"
+

@@ -1,0 +1,3 @@
+PROG_NAME=	mbimapidle
+VERSION=	0.90
+DOCDIR?=	${DATADIR}/doc/${PROG_NAME}

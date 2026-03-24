@@ -1,5 +1,4 @@
-PROG=           mbimapidle
-PROG_VERSION=   0.90
+PROG=		${PROG_NAME}
 PREFIX?=	/usr/local
 LOCALBASE?=	/usr/local
 BINDIR=		${PREFIX}/bin
@@ -12,12 +11,13 @@ SRCS= main.c mbox.c imap.c base64.c common.c
 
 WARNS = 4
 CFLAGS   +=     -DPROG='"${PROG}"'
-CFLAGS   +=     -DVERSION='"${PROG_VERSION}"'
+CFLAGS   +=     -DVERSION='"${VERSION}"'
 
 .if defined(DEBUG)
 CFLAGS   +=     -g -ggdb
 .endif
 
+.include "../inc.mk"
 .include <mkc.prog.mk>
 
 # Add dependency on Makefile
