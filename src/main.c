@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
 	struct sigaction sa;
 	int ret = EXIT_FAILURE;
 
-	while ((ch = getopt_long(argc, argv, "h", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "hvfd", opts, NULL)) != -1) {
 		switch(ch) {
 			case 'h':
 			case ARG_HELP:
