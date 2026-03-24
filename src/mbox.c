@@ -493,7 +493,7 @@ void mbox_run_sync (struct mbox *m)
 
 		if (!foreground) {
 			/* Redirect stderr to stdout */
-			dup2(STDOUT_FILENO, STDERR_FILENO);
+			dup2(fd[1], STDERR_FILENO);
 			dup2(fd[1], STDOUT_FILENO);
 			close(fd[0]);
 		}
@@ -535,7 +535,7 @@ void mbox_get_pass (struct mbox *m)
 	if (m->pass_pid == 0) {
 		int ret;
 
-		dup2(STDOUT_FILENO, STDERR_FILENO);
+		close(STDERR_FILENO);
 		dup2(fd[1], STDOUT_FILENO);
 		close(fd[0]);
 
