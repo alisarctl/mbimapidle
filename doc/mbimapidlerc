@@ -1,3 +1,5 @@
+# see man 1 mbimapidle for more details
+
 [general]
 verbose="true"
 
@@ -5,8 +7,15 @@ verbose="true"
 hostname = "hostname1"
 password  =  "pass1" # Comment
 username = "user1"
+# sync command to run on mailbox new messages
+# command must be in user $PATH
 sync_cmd = "/usr/bin/mbsync -a"
+# How much time to wait before renewing IDLE subscription According to RFC
+# 2177, a server may consider a client inactive after 30 idle_timeout can be
+# between 5 to 29 minutes, default: 10 minutes.
 idle_timeout = "10"
+# Enable/disable checking server ssl certification
+# Default: true
 check_certificate="false"
 port = "993"
 tls_type="ssl"

@@ -1,21 +1,17 @@
 .\" Written by Ali Abdallah (ali.abdallah@suse.com)
 .\" ------------------------------------------------------------------
 .TH mbimapidle 1 "@DATE@" "mbimapidle (@VERSION@)" "User Commands"
-
 .SH NAME
 mbimapidle \- execute command on new IMAP messages
 .SH SYNOPSIS
-
 \fBmbimapidle\fR [\fIoptions\fR]
 .br
 .
-
 .SH DESCRIPTION
 .P
 \fBmbimapidle\fR maintains persistent server connection using IMAP protocol (RFC
 2177) IDLE extension and execute sync command on new messages.
 .
-
 .SH OPTIONS
 .TP
 .TP
@@ -32,7 +28,6 @@ Print debugging messages (default: disabled)
 Run in the foreground instead of forking into a background process (default:
 run the background)
 .
-
 .SH "CONFIGURATION"
 The configuration file is mandatory and should be located at
 .TP
@@ -41,21 +36,72 @@ The configuration file is mandatory and should be located at
 .P
 Lines starting with (#) are comments and are ignored. Configuration file is
 defined in sections, an optional [general] section and [MailBoxName] section
-defining a mailbox to monitor, you can add as much [MailBoxName] as you like.
+defining a mailbox to monitor, you can define multiple [MailBoxName] to monitor.
+
+Configuration entries are composed of \fBkey\fR and \fBvalue\fR such as
+key="value", \fBvalue\fR is always double quoted.
+
+\fBmbimapidle\fR will refuse to start if the configuration is invalid, you can
+reload the configuration by sending SIGHUP to the process. On SIGHUP, if the
+loaded configuration is invalid, \fBmbimapidle\fR will go inactive (but will
+not exit), until the configuration is adjusted and so another SIGHUP can be
+sent to activate back \fBmbimapidle\fR and mailbox monitoring
 .
 .SS General section [general]
 This is an optional section currently controls only daemon verbosity
 .TP
-\fBverbose\fR=\fI"value"\fR 
-set value to \fBtrue\fR to enabled verbosity, default value \fBfalse\fR.  Note
+\fBverbose\fR
+set to \fBtrue\fR to enabled verbosity, default value \fBfalse\fR.  Note
 if verbosity is set to \fBfalse\fR, and \fBmbimapidle\fR is run with \fB-d\fR,
 \fB--debug\fR you will still get verbose messages.
 .SS Mail box section [MailBoxName]
+.TP
+\fBhostname\fR\f
+imap server hostname to connect to.
+.TP
+\fBusername\fR
+username to authenticate with the imap server
+.TP
+\fBpassword\fR
+password to use for authentication.
+.TP
+\fBpass_cmd\fR
+use a custom command to get the password. NOTE: in a mailbox configuration,
+you can only set
+\fBpassword="PASS"\fR or \fBpass_cmd="PASS_CMD"\fR but not both.
+.TP
+\fBidle_timeout\fR
+According to RFC 2177, a server may consider a client inactive after 30
+minutes. \fBidle_timeout\fR instructs \fBmbimapidle\fR after how much time it
+should re-new IDLE subscription to the server. Depending on your preferences,
+you can set \fBidle_timeout\fR to values between 5 to 29 minutes. (Default value: 10 minutes)
+.TP
+\fBcheck_certificate\fR
+set \fBfalse\fR to disable checking server ssl certification (not recommended).
+.TP
+\fBport\fR
+imap server TCP port to connect to.
+.TP
+\fBtls_type\fR
+Specify ssl connection type, \fBnone\fR, \fBssl\fR or \fBstarttls\fR. If not
+specified
+\fBssl\fR is the default on port 993
+\fBstarttls\fR is the default on port 143.
+Setting it to \fBnone\fR disable ssl encryption and so username and password
+will be communicated with the server plaintext, only use this mode if YOU KNOW
+WHAT YOU ARE DOING (for example your are using a encrypted tunnel).
+.TP
+\fBauth\fR
+\fBplain\fR sends credentials in plaintext, it is safe when \fBtls_type\fR is
+configured to \fBssl\fR or \fBstartssl\fR.
+\fBXOAUTH2\fR modern authentication mechanism mainly by Gmail and Microsoft®
+Outlook/Office 365, it requires OAuth 2.0 access token, rather than a password.
+Depending on the OAuth imap server, so you should use a custom password command
+to supply \fBpass_cmd\fR to supply in the password.
 
 For a sample configuration file, please checkout out:
 .TP
 \fB@CONF_EXAMPLE@\fR
 .
-
 .SH AUTHOR
 Ali Abdallah (ali.abdallah@suse.com)
