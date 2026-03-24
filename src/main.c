@@ -139,6 +139,16 @@ static void mbox_proc(struct mbox*m)
 			ssize_t nbytes = 0;
 			size_t rc = 0;
 
+			if (status != 0) {
+				mlog(LOG_ERR,
+				"'%s' password command failed with status code %d\n",
+				m->name, status);
+				mlog(LOG_ERR,
+				"'%s' disabled, please fix the problem and reload the daemon with SIGHUP\n",
+				m->name);
+				goto disable;
+			}
+
 			ioctl(m->pass_pipe_fd, FIONREAD, &nbytes);
 
 			if (nbytes > MAX_PASS_TOKEN_LEN - 1) {
@@ -157,13 +167,15 @@ static void mbox_proc(struct mbox*m)
 				}
 			} while (rc != nbytes);
 
+			if (m->password[nbytes - 1] == '\n') {
+				m->password[nbytes - 1] = '\0';
+			}
+
 			m->state = MBOX_INIT_CONNECT;
 			goto out;
-
 disable:
 			m->state = MBOX_DISABLED;
 out:
-			mlog(LOG_DEBUG, "'%s' Got password '%s'\n", m->name, m->password);
 			m->pass_pid = 0;
 			close(m->pass_pipe_fd);
 		}
