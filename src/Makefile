@@ -14,10 +14,21 @@ WARNS = 4
 CFLAGS   +=     -DPROG='"${PROG}"'
 CFLAGS   +=     -DVERSION='"${PROG_VERSION}"'
 
+.if defined(DEBUG)
+CFLAGS   +=     -g -ggdb
+.endif
+
 .include <mkc.prog.mk>
 
+# Add dependency on Makefile
+ALLOBJS = ${SRCS:.c=.o}
+.for o in ${ALLOBJS}
+${o}: Makefile
+.endfor
+
 clean:
-	rm -rf ${MKC_CACHEDIR}
+	echo "${OBJS}"
+	rm -rf ${MKC_CACHEDIR} .depend
 
 help:
 	@echo "Targets are: all, install, clean, help"
