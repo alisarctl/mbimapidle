@@ -23,10 +23,11 @@ a Lightweight and easy to deploy replacement for GNU autotools.
 
 | Option | Description |
 | --- | --- |
-| PREFIX=DIR |use DIR as the installation prefix.|
+| PREFIX=DIR | use DIR as the installation prefix.|
 | RC=**openrc** or **systemd**| install **openrc** or **systemd** user service file|
-| RCDIR=DIR |use DIR as the user service file installation dir|
-| DOCDIR=DIR |use DIR as the installation target for documentation and example configuration file|
+| RCDIR=DIR | use DIR as the user service file installation dir|
+| MANDIR=DIR | use DIR to install manual file to (default: ${PREFIX}/share/man) |
+| DOCDIR=DIR | use DIR as the installation target for documentation and example configuration file|
 
 ## Linux (openrc) 
 ```

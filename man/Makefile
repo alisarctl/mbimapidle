@@ -1,4 +1,5 @@
-MAN=	mbimapidle.1
+MAN=		mbimapidle.1
+MANDIR?=	${PREFIX}/share/man
 DOCDIR?=	${DATADIR}/doc/${PROG_NAME}
 CONF_EXAMPLE=	${DOCDIR}/mbimapidlerc
 
