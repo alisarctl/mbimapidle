@@ -1,6 +1,5 @@
 PROG=		${PROG_NAME}
 PREFIX?=	/usr/local
-LOCALBASE?=	/usr/local
 BINDIR=		${PREFIX}/bin
 LIBDIR=		${PREFIX}/lib
 

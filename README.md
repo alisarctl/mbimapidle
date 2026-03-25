@@ -13,11 +13,20 @@ a Lightweight and easy to deploy replacement for GNU autotools.
 1. mk-configure
 2. openssl-3
 
-## BSD
-```
-$ mkcmake
-# mkcmake install PREFIX=/usr/local
-```
+**mkcmake [Compile options]**
+
+| Option | Description |
+| --- | --- |
+| DEBUG=1 |Enable debugging symbols|
+
+**mkcmake [Installation options]**
+
+| Option | Description |
+| --- | --- |
+| PREFIX=DIR |use DIR as the installation prefix.|
+| RC=**openrc** or **systemd**| install **openrc** or **systemd** user service file|
+| RCDIR=DIR |use DIR as the user service file installation dir|
+| DOCDIR=DIR |use DIR as the installation target for documentation and example configuration file|
 
 ## Linux (openrc) 
 ```
@@ -29,6 +38,11 @@ $ mkcmake
 ```
 $ mkcmake
 # mkcmake install PREFIX=/usr RC=systemd RCDIR=/etc/systemd/user
+```
+## BSD
+```
+$ mkcmake
+# mkcmake install PREFIX=/usr/local
 ```
 
 # Configuration file
@@ -60,10 +74,6 @@ $ rc-service -U mbimapidle start
 ## systemd
 systemctl --user enable mbimapidle
 systemctl --user start mbimapidle
-
-# TODO
-* man pages
-* complete command line arguments
 
 # Features
 * STARTTLS, TLS support
