@@ -165,9 +165,10 @@ static bool imap_check_login(struct mbox *m)
 
 static bool imap_is_keep_alive(struct mbox *m)
 {
-	mlog(LOG_DEBUG, "'%s' Keep alive '%s'\n", m->name, m->buf);
-	if (strstr(m->buf, "* OK Still here") != NULL)
+	if (strstr(m->buf, "* OK Still here") != NULL) {
+		mlog(LOG_DEBUG, "'%s' Keep alive '%s'\n", m->name, m->buf);
 		return true;
+	}
 	return false;
 }
 
