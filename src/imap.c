@@ -31,6 +31,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include <sys/select.h>
 
@@ -179,6 +180,68 @@ static bool imap_is_capability(struct mbox *m)
 	if (!strncmp(m->buf, "* CAPABILITY ", 13))
 		return true;
 	return false;
+}
+
+
+/* Parse server IDLE notification string
+ *
+ * if We find '* NUM RECENT' then NUM is returned
+ * otherwise 0 is returned
+ */
+static unsigned int imap_is_new_message (const char *val, size_t len) {
+	unsigned int num = 0;
+
+	for (int i = 0; i < len; i++) {
+		int next_space = -1;
+		/* Search for a '*' */
+		if (val[i] == '*') {
+			int star_pos = i;
+
+			/* We have it, make sure next char is a space, if not skip it*/
+			if (i + 1 < len && !isspace(val[i+1])) {
+				continue;
+			}
+
+			/* Always check we have enough in len */
+			if (i + 2 < len) {
+				/* Skip all characters until we get a space */
+				for (int j = i + 2; j < len; j++) {
+					if (isspace(val[j])) {
+						next_space = j;
+						break;
+					}
+				}
+
+				if (next_space > 0) {
+					/* Now we have '* XXXXX '
+					   Check to see what comes next if ' RECENT'
+					   */
+					if (next_space + 7 <= len && !strncmp(val + next_space, " RECENT", 7)) {
+						int skip = 0;
+						/* We have now '* XXXX RECENT'
+						 * Check that XXXX are all digits before
+						 * parsing with sscanf*/
+						for (int j = star_pos + 2; j < next_space; j++) {
+							if (!isdigit(val[j])) {
+								skip = 1;
+							}
+						}
+						/* Some XXXX is not a digit, refuse the string */
+						if (skip) continue;
+						/* We have our string
+						 * '* NUM RECENT'
+						 **/
+						if (sscanf(val + star_pos, "* %u RECENT", &num) == 1) {
+							/* Found it, go out of the loop */
+							break;
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return num;
 }
 
 static void mbox_conn_init (struct mbox *m)
@@ -913,10 +976,15 @@ void mbox_idle_proc(struct mbox *m)
 		case MBOX_IDLE:
 			if (mbox_read(m, false)) {
 				if (!imap_is_keep_alive(m)) {
-					/* FIXME, check if we have new messages */
+					unsigned int num_new;
 					mlog(LOG_DEBUG, "'%s' Server notification '%s'\n", m->name, m->buf);
-					mlog(LOG_DEBUG, "'%s' Running sync command\n", m->name);
-					mbox_run_sync(m);
+					if ((num_new = imap_is_new_message(m->buf, m->buf_len))) {
+						mlog(LOG_DEBUG, "'%s' Got '%u' new %s - running sync command\n",
+							m->name,
+							num_new,
+							num_new == 1 ? "message" : "messages");
+						mbox_run_sync(m);
+					}
 				}
 				RESET_BUFFER(m);
 			} else {
