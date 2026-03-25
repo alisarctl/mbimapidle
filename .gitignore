@@ -1,3 +1,5 @@
 mbimapidle
 *.o
 mk-cache
+release.sh
+.gitattributes
