@@ -52,14 +52,14 @@
 enum {
 	ARG_HELP,
 	ARG_VERSION,
-	ARG_FOREGROUND,
+	ARG_BACKGROUND,
 	ARG_DEBUG
 };
 
 static struct option opts[] = {
 	{ "help",		no_argument, 0, ARG_HELP},
 	{ "version",		no_argument, 0, ARG_VERSION },
-	{ "foreground",		no_argument, 0, ARG_FOREGROUND},
+	{ "background",		no_argument, 0, ARG_BACKGROUND},
 	{ "debug",		no_argument, 0, ARG_DEBUG },
 	{NULL, 0, NULL, 0}
 };
@@ -73,7 +73,7 @@ static volatile bool reload_all = false;
 
 bool log_to_syslog = false;
 bool debug = false;
-bool foreground = false;
+bool background = false;
 
 static void show_help(void)
 {
@@ -83,7 +83,7 @@ static void show_help(void)
 		"	-v, --version			Show version\n"
 		"	-d, --debug			Print debugging messages (default: disabled)\n"
 		"OPTIONS:\n"
-		"	-f, --foreground		Run in the foreground (default: run in the background)\n\n",
+		"	-b, --background		Run in the background (default: false)\n\n",
 		PROG);
 }
 
@@ -114,7 +114,7 @@ static void mbox_proc(struct mbox*m)
 		if (waitpid(m->sync_pid, &status, WNOHANG) == m->sync_pid) {
 			m->sync_pid = 0;
 			/* FIXME: Maybe an option to print sync command output */
-			if (!foreground && debug) {
+			if (background && debug) {
 				ssize_t nbytes = 0;
 				size_t rc = 0;
 				char msg[256];
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
 	struct sigaction sa;
 	int ret = EXIT_FAILURE;
 
-	while ((ch = getopt_long(argc, argv, "hvfd", opts, NULL)) != -1) {
+	while ((ch = getopt_long(argc, argv, "hvbd", opts, NULL)) != -1) {
 		switch(ch) {
 			case 'h':
 			case ARG_HELP:
@@ -234,9 +234,9 @@ int main(int argc, char *argv[])
 				printf("%s: %s\n", PROG, VERSION);
 				return EXIT_SUCCESS;
 
-			case 'f':
-			case ARG_FOREGROUND:
-				foreground = true;
+			case 'b':
+			case ARG_BACKGROUND:
+				background = true;
 				break;
 
 			case 'd':
@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (!foreground) {
+	if (background || !isatty (STDOUT_FILENO)) {
 		openlog("mbimapidle", LOG_PID, LOG_DAEMON);
 		log_to_syslog = true;
 	}
@@ -265,7 +265,7 @@ int main(int argc, char *argv[])
 		goto failure_ssl;
 	}
 
-	if (!foreground) {
+	if (background) {
 		if ((daemon = fork()) == -1) {
 			mlog(LOG_ERR, "Failed to fork to run in the background\n");
 		} else if (daemon != 0) {

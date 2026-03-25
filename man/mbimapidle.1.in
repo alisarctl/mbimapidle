@@ -24,9 +24,8 @@ Display version information.
 \fB-d\fR, \fB--debug\fR
 Print debugging messages (default: disabled)
 .TP
-\fB-f\fR, \fB--foreground\fR
-Run in the foreground instead of forking into a background process (default:
-run the background)
+\fB-b\fR, \fB--background\fR
+Run in the background (default: false)
 .
 .SH "CONFIGURATION"
 The configuration file is mandatory and should be located at

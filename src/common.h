@@ -56,7 +56,7 @@
 extern volatile int main_loop_running;
 extern bool log_to_syslog;
 extern bool debug;
-extern bool foreground;
+extern bool background;
 
 #ifdef LOG_WARN
 #undef LOG_WARN

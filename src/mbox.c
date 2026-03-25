@@ -496,7 +496,7 @@ void mbox_run_sync (struct mbox *m)
 	}
 	mlog(LOG_DEBUG,"'%s' executing sync command\n", m->name);
 
-	if (!foreground && pipe(fd) < 0 ) {
+	if (background && pipe(fd) < 0 ) {
 		mlog(LOG_ERR, "'%s' pipe error '%s'", m->name, strerror(errno));
 		return;
 	}
@@ -509,7 +509,7 @@ void mbox_run_sync (struct mbox *m)
 	if (m->sync_pid == 0) {
 		int ret;
 
-		if (!foreground) {
+		if (background) {
 			/* Redirect stderr to stdout */
 			dup2(fd[1], STDERR_FILENO);
 			dup2(fd[1], STDOUT_FILENO);
@@ -523,7 +523,7 @@ void mbox_run_sync (struct mbox *m)
 			     m->name, m->sync_cmd, strerror(errno));
 			exit(-1);
 		}
-	} else if (!foreground) {
+	} else if (background) {
 		close(fd[1]);
 		m->sync_cmd_stdout = fd[0];
 	}
