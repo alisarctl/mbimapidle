@@ -121,9 +121,19 @@ static bool check_key_value(char *line, char **key, char **val)
 
 static bool validate_general_config(char *key, char *val)
 {
-	if (!strncmp(key, "verbose", 7))
-		if (!strncmp(val, "true", 4) || !strncmp(val, "false", 5))
+	if (!strncmp(key, "verbose", 7)) {
+		if (!strncmp(val, "true", 4)) {
+			/* Take the max between debug command line argument
+			 * and configuration */
+			debug = MAX(true, debug);
 			return true;
+		}
+		/* if debug is disabled, and it is not given in the command line
+		 * do nothing, just check for the value
+		 */
+		if (!strncmp(val, "false", 5))
+			return true;
+	}
 	return false;
 }
 
