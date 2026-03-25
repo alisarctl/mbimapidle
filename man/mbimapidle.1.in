@@ -98,6 +98,11 @@ configured to \fBssl\fR or \fBstartssl\fR.
 Outlook/Office 365, it requires OAuth 2.0 access token, rather than a password.
 Depending on the OAuth imap server, so you should use a custom password command
 to supply \fBpass_cmd\fR to supply in the password.
+.TP
+\fBselect\fR
+mailbox dir to watch, normally you don't have to change this, the default value
+"INBOX" issufficient in most cases.
+.TP
 
 For a sample configuration file, please checkout out:
 .TP

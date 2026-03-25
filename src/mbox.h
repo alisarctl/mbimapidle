@@ -87,6 +87,7 @@ struct mbox {
 	char     *hostname;
 	char     *username;
 	char     *password;
+	char     *select_mbox;
 	char     *pass_cmd;
 	char    **pass_args;
 	char     *sync_cmd;       /* Command to run on new emails */

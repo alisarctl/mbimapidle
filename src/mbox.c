@@ -152,6 +152,12 @@ static bool validate_block_config(struct mbox *m, char *key, char *val)
 		return true;
 	}
 
+	if (!strncmp(key, "select", 6)) {
+		FREE_STR(m->select_mbox);
+		m->select_mbox = strdup(val);
+		return true;
+	}
+
 	if (!strncmp(key, "sync_cmd", 8)) {
 		val = trim(val);
 		return parse_cmd(m->name, val, &m->sync_cmd, &m->sync_args);
@@ -376,8 +382,10 @@ bool conf_init(void)
 			memcpy(m->name, "MBOX: ", 6);
 			strncpy(m->name + 6, p + 1, strlen(p) - 2);
 
+			/* Default values */
 			m->check_cert = true;
 			m->auth_type = AUTH_TYPE_PLAIN;
+			m->select_mbox = strdup("INBOX");
 			m->state_timeout = SEC_MS(10);
 
 			in_block = true; in_general = false;
@@ -578,6 +586,7 @@ void mbox_free(struct mbox *m)
 	FREE_STR(m->name);
 	FREE_STR(m->hostname);
 	FREE_STR(m->username);
+	FREE_STR(m->select_mbox);
 	FREE_STR(m->sync_cmd);
 	FREE_STR(m->password);
 	FREE_STR(m->pass_cmd);

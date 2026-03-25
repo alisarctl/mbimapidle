@@ -58,6 +58,7 @@ static SSL_CTX *ssl_ctx = NULL;
 #define IMAP_TAG_STR "AXXXXXXXXXX "
 #define IMAP_TAG_STR_LEN 12
 #define IMAP_PLAIN_LOGIN "LOGIN "
+#define IMAP_SELECT "SELECT "
 #define IMAP_XOAUTH2_AUTH "AUTHENTICATE XOAUTH2 "
 #define BEARER_AUTH_STR "user=\001auth=Bearer \001\001"
 
@@ -747,11 +748,19 @@ static bool mbox_read(struct mbox *m, bool block)
 
 static bool mbox_select(struct mbox *m)
 {
-	char msg[32];
+	char *msg;
+	size_t msg_len;
 	bool ret;
 
-	memset(msg, 0, sizeof(msg));
-	sprintf(msg, "A%010d SELECT INBOX\r\n", ++m->tag);
+	/* AXXXXXXXXXX SELECT INBOX\r\n\0' */
+	/* add length for \r\n\0' */
+	msg_len = strlen(IMAP_TAG_STR IMAP_SELECT) + 3;
+	msg_len += strlen(m->select_mbox);
+	msg = malloc(msg_len);
+	memset(msg, 0, msg_len);
+
+	snprintf(msg, msg_len, "A%010d SELECT %s\r\n",
+		++m->tag, m->select_mbox);
 
 	if (m->tls_type == TLS_TYPE_NONE)
 		ret = mbox_write(m, msg);
@@ -760,6 +769,8 @@ static bool mbox_select(struct mbox *m)
 
 	if (!ret)
 		mlog(LOG_ERR, "'%s' Failed to select INBOX \n", m->name);
+
+	FREE_STR(msg);
 	return ret;
 }
 
