@@ -45,51 +45,38 @@ static char *get_conf_dir_path(void)
 	char *config_home;
 	char *tmp;
 	char *home = getenv("HOME");
-	char *p = NULL;
-	size_t config_path_len = 0;
 
 	if (!home) {
 		mlog(LOG_ERR,"HOME env is not set aborting\n");
-		goto out;
+		return NULL;
 	}
 
 	tmp = getenv("XDG_CONFIG_HOME");
 
 	if(!tmp) {
 		mlog(LOG_INFO,"XDG_CONFIG_HOME not set, assuming ~/.config\n");
-		config_home = malloc(strlen(home) + strlen("/.config") + 1);
-		sprintf(config_home, "%s/.config", home);
+		config_home = strdup_printf("%s/.config/%s", home, CONFIG_DNAME);
 	} else {
-		config_home = strdup(tmp);
+		config_home = strdup_printf("%s/%s", tmp, CONFIG_DNAME);
 	}
 
-	config_path_len = strlen(home) + strlen(config_home);
-	/* count also a '/' + '\0' */
-	config_path_len += strlen(CONFIG_DNAME) + 2;
+	RET_IF_OOM(config_home, NULL);
 
-	assert (config_path_len < PATH_MAX);
-
-	p = malloc(config_path_len);
-
-	sprintf(p, "%s/%s", config_home, CONFIG_DNAME);
-	free(config_home);
-out:
-	return p;
+	return(config_home);
 }
 
 static char *get_fpath(const char *fname)
 {
 	char *conf_dir_path;
-	char *fp;
+	char *fp = NULL;
 
 	conf_dir_path = get_conf_dir_path();
 
-	assert (strlen(conf_dir_path) + strlen(fname) + 1 < PATH_MAX);
-	/* adding 2: slash + '\0' */
-	fp = malloc (strlen(conf_dir_path) + strlen(fname) + 2);
+	if (conf_dir_path) {
+		fp = strdup_printf("%s/%s", conf_dir_path, fname);
+		FREE_STR(conf_dir_path);
+	}
 
-	sprintf(fp, "%s/%s", conf_dir_path, fname);
-	free(conf_dir_path);
 	return fp;
 }
 

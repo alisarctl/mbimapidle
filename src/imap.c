@@ -57,10 +57,6 @@ static SSL_CTX *ssl_ctx = NULL;
 #define IMAP_TAG     "A%010d "
 #define IMAP_TAG_STR "AXXXXXXXXXX "
 #define IMAP_TAG_STR_LEN 12
-#define IMAP_PLAIN_LOGIN "LOGIN "
-#define IMAP_SELECT "SELECT "
-#define IMAP_XOAUTH2_AUTH "AUTHENTICATE XOAUTH2 "
-#define BEARER_AUTH_STR "user=\001auth=Bearer \001\001"
 
 static inline void handle_failure(struct mbox *m)
 {
@@ -604,48 +600,34 @@ static bool mbox_authenticate(struct mbox *m)
 {
 	char *msg, *xoauth;
 	char *b64;
-	size_t msg_len, xoauth_len;
 	bool ret;
 	int b64_len = 0;
 
 	if (m->auth_type == AUTH_TYPE_PLAIN) {
-		/* AXXXXXXXXXX LOGIN "USER" "PASS"\r\n\0' */
-		/* add length for \r\n\0' */
-		msg_len  = strlen(IMAP_TAG_STR IMAP_PLAIN_LOGIN) + 3;
-
-		/* add 4 for quotes and 1 for space between user and pass */
-		msg_len += strlen(m->username) + strlen(m->password) + 5;
-		msg = malloc(msg_len);
-
-		memset(msg, 0, msg_len);
-		snprintf(msg, msg_len, "A%010d LOGIN \"%s\" \"%s\"\r\n",
-				++m->tag, m->username, m->password);
+		msg = strdup_printf("A%010d LOGIN \"%s\" \"%s\"\r\n",
+				    ++m->tag, m->username, m->password);
 
 	} else if (m->auth_type == AUTH_TYPE_XOAUTH2) {
-		/* add length for \r\n\0' */
-		xoauth_len = strlen(BEARER_AUTH_STR) + 3;
-		xoauth_len += strlen(m->username) + strlen(m->password);
+		xoauth = strdup_printf("user=%s\001auth=Bearer %s\001\001",
+					m->username, m->password);
 
-		xoauth = malloc(xoauth_len);
-		memset(xoauth, 0, xoauth_len);
-
-		snprintf(xoauth, xoauth_len, "user=%s\001auth=Bearer %s\001\001",
-			 m->username, m->password);
+		RET_IF_OOM(xoauth, false);
 
 		b64 = b64_encode(xoauth, &b64_len);
 
-		/* tag length + auth message + \r\n\0 */
-		msg_len = strlen(IMAP_TAG_STR IMAP_XOAUTH2_AUTH) + 3;
-		msg_len += b64_len;
-		msg = malloc(msg_len);
+		if (!b64) {
+			OOM();
+			FREE_STR(xoauth);
+			return false;
+		}
+		msg = strdup_printf("A%010d AUTHENTICATE XOAUTH2 %s\r\n", ++m->tag, b64);
 
-		memset(msg, 0, msg_len);
-
-		snprintf(msg, msg_len, "A%010d AUTHENTICATE XOAUTH2 %s\r\n", ++m->tag, b64);
 		FREE_STR(xoauth);
 		FREE_STR(b64);
 	} else
 		assert_not_reached();
+
+	RET_IF_OOM(msg, false);
 
 	if (m->tls_type == TLS_TYPE_NONE) {
 		ret = mbox_write(m, msg);
@@ -749,18 +731,11 @@ static bool mbox_read(struct mbox *m, bool block)
 static bool mbox_select(struct mbox *m)
 {
 	char *msg;
-	size_t msg_len;
 	bool ret;
 
-	/* AXXXXXXXXXX SELECT INBOX\r\n\0' */
-	/* add length for \r\n\0' */
-	msg_len = strlen(IMAP_TAG_STR IMAP_SELECT) + 3;
-	msg_len += strlen(m->select_mbox);
-	msg = malloc(msg_len);
-	memset(msg, 0, msg_len);
+	msg = strdup_printf("A%010d SELECT %s\r\n", ++m->tag, m->select_mbox);
 
-	snprintf(msg, msg_len, "A%010d SELECT %s\r\n",
-		++m->tag, m->select_mbox);
+	RET_IF_OOM(msg, false);
 
 	if (m->tls_type == TLS_TYPE_NONE)
 		ret = mbox_write(m, msg);

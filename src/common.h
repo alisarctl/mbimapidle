@@ -114,6 +114,17 @@ static inline void tick_wait(void)
 	nanosleep(&ts, &ts);
 }
 
+static inline char* strdup_printf (const char *fmt, ...)
+{
+	char *str;
+	va_list args;
+
+	va_start (args, fmt);
+	vasprintf(&str, fmt, args);
+	va_end(args);
+	return str;
+}
+
 char *get_conf_file_path (void);
 
 bool  parse_cmd          (const char *mbox_name,
@@ -143,6 +154,17 @@ bool  parse_cmd          (const char *mbox_name,
 #define assert_not_reached() do { \
 	mlog(LOG_ERR, "Assertion failed %s:%d code should not be reached", __FILE__, __LINE__); \
 	exit(EXIT_FAILURE); \
+} while (0);
+
+#define OOM() do { \
+	mlog(LOG_ERR, "Out-of-memory %s:%d\n", __FILE__, __LINE__);  \
+} while (0);
+
+#define RET_IF_OOM(__ptr, __val) do {		\
+	if (!__ptr) {				\
+		OOM();				\
+		return __val;			\
+	}					\
 } while (0);
 
 #endif
