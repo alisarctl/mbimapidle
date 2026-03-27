@@ -4,7 +4,9 @@ BINDIR=		${PREFIX}/bin
 LIBDIR=		${PREFIX}/lib
 
 MKC_REQUIRE_PKGCONFIG=libssl libcrypto
+MKC_REQUIRE_FUNCS3=vasprintf:stdio.h
 MKC_CACHEDIR=mk-cache
+MKDEPEND=yes
 
 SRCS= main.c mbox.c imap.c base64.c common.c
 

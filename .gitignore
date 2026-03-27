@@ -1,5 +1,6 @@
 mbimapidle
 *.o
+*.d
 mk-cache
 release.sh
 *.swp
