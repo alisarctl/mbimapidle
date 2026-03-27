@@ -2,4 +2,6 @@ mbimapidle
 *.o
 mk-cache
 release.sh
-.gitattributes
+*.swp
+*.tar.gz
+man/mbimapidle.1

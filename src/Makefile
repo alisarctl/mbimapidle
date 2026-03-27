@@ -26,8 +26,7 @@ ${o}: Makefile
 .endfor
 
 clean:
-	echo "${OBJS}"
-	rm -rf ${MKC_CACHEDIR} .depend
+	rm -rf ${MKC_CACHEDIR}
 
 help:
 	@echo "Targets are: all, install, clean, help"
