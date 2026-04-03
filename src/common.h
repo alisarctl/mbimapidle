@@ -34,7 +34,9 @@
 #include <stdio.h>
 #include <syslog.h>
 #include <stdbool.h>
-#include <time.h>
+
+extern bool debug;
+extern bool background;
 
 #define TICK_MS 200
 #define SEC_MS(x) (x*1000)
@@ -53,84 +55,11 @@
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
 
-extern volatile int main_loop_running;
-extern bool log_to_syslog;
-extern bool debug;
-extern bool background;
-
 #ifdef LOG_WARN
 #undef LOG_WARN
 #endif
 
 #define LOG_WARN LOG_WARNING
-
-static inline void mlog (int level, const char *format, ...)
-{
-	va_list args;
-
-	if (!debug && (level == LOG_DEBUG))
-		return;
-
-	va_start (args, format);
-
-	if (log_to_syslog) {
-		vsyslog(level, format, args);
-	} else {
-		time_t t = time(NULL);
-		char *c = ctime(&t);
-		switch(level) {
-			case LOG_DEBUG:
-				printf("Debug: ");
-				break;
-			case LOG_ERR:
-				printf("ERR:   ");
-				break;
-			case LOG_WARNING:
-				printf("Warn:  ");
-				break;
-			case LOG_INFO:
-			case LOG_NOTICE:
-				printf("Info:  ");
-				break;
-			default:
-				printf("       ");
-				break;
-		}
-		printf("[");
-		do {
-			printf("%c", *c++);
-		} while(*c != '\n' && *c != '\0');
-		printf("] ");
-		vprintf(format, args);
-	}
-	va_end(args);
-}
-
-static inline void tick_wait(void)
-{
-	struct timespec ts;
-	ts.tv_sec = TICK_MS / 1000;
-	ts.tv_nsec = (TICK_MS % 1000) * 1000000;
-	nanosleep(&ts, &ts);
-}
-
-static inline char* strdup_printf (const char *fmt, ...)
-{
-	char *str;
-	va_list args;
-
-	va_start (args, fmt);
-	vasprintf(&str, fmt, args);
-	va_end(args);
-	return str;
-}
-
-char *get_conf_file_path (void);
-
-bool  parse_cmd          (const char *mbox_name,
-		char *val,
-		char **cmd,
-		char **argv[]);
 
 #define FREE_STR(ptr) \
 	do  { \
@@ -166,5 +95,24 @@ bool  parse_cmd          (const char *mbox_name,
 		return __val;			\
 	}					\
 } while (0);
+
+static inline void tick_wait(void)
+{
+	struct timespec ts;
+	ts.tv_sec = TICK_MS / 1000;
+	ts.tv_nsec = (TICK_MS % 1000) * 1000000;
+	nanosleep(&ts, &ts);
+}
+
+char		*get_conf_file_path		(void);
+
+bool		parse_cmd			(const char *mbox_name,
+						char *val,
+						char **cmd,
+						char **argv[]);
+
+char*		strdup_printf			(const char *fmt, ...);
+
+void		mlog				(int level, const char *format, ...);
 
 #endif

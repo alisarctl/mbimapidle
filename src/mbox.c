@@ -137,9 +137,6 @@ static bool validate_general_config(char *key, char *val)
 	return false;
 }
 
-#undef UINT16_MAX
-#define UINT16_MAX 0xffff
-
 static bool validate_block_config(struct mbox *m, char *key, char *val)
 {
 	assert(m != NULL);
@@ -246,7 +243,7 @@ static bool validate_block_config(struct mbox *m, char *key, char *val)
 	return false;
 }
 
-static bool check_mbox_fields(struct mbox *m)
+static bool check_required_mbox_fields(struct mbox *m)
 {
 	if (!m->hostname) {
 		mlog(LOG_ERR,"Missing hostname from config '%s'\n", m->name);
@@ -325,11 +322,13 @@ bool conf_init(void)
 	if (!p) return false;
 
 	config = fopen(p, "r");
-	FREE_STR(p);
 	if (!config) {
-		mlog(LOG_ERR,"Failed to load configuration file '%s'\n", strerror(errno));
+		mlog(LOG_ERR,"Failed to load configuration file '%s':'%s'\n",
+		strerror(errno));
+		FREE_STR(p);
 		return false;
 	}
+	FREE_STR(p);
 
 	in_general = false;
 	in_block = false;
@@ -431,7 +430,7 @@ bool conf_init(void)
 
 	TAILQ_FOREACH(m, &mbox_head, mboxes) {
 		num_mbox++;
-		if (!check_mbox_fields(m)) {
+		if (!check_required_mbox_fields(m)) {
 			mlog(LOG_ERR,"Incomplete configuration for mbox '%s'\n", m->name);
 			goto error_config;
 		}
@@ -449,7 +448,7 @@ bool conf_init(void)
 	FREE_STR(line);
 	return true;
 error_syntax:
-	mlog(LOG_ERR, "Syntax error near '%s' line %d\n", p, linenum);
+	mlog(LOG_ERR, "Config error near '%s' line %d\n", p, linenum);
 	FREE_STR(p);
 error_config:
 	fclose(config);
