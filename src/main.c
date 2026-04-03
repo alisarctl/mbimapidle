@@ -64,7 +64,7 @@ static struct option opts[] = {
 	{NULL, 0, NULL, 0}
 };
 
-/* extern variables */
+
 volatile int main_loop_running = 1;
 
 /* Ignore SIGHUP for 10 seconds after the first one received */
