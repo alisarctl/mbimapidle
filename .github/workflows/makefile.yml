@@ -18,18 +18,36 @@ jobs:
       - name: Ubuntu setup
         run: /bin/sh -c "$GITHUB_WORKSPACE/.github/workflows/setup-ubuntu.sh"
 
-      - name: Compiler settings
-        run: mkc_compiler_settings
+      - name: configure-plain
+        run: /bin/sh configure
 
-      - name: Compile
-        run: mkcmake
+      - name: compile-plain
+        run: bmake
 
-      - name: install
-        run: mkcmake RC=systemd PREFIX=${PWD}/usr RCDIR=${PWD}/etc/systemd/user install
+      - name: install-plain
+        run: sudo bmake install
 
-      - name: install-systemd
-        run: mkcmake RC=systemd PREFIX=${PWD}/usr RCDIR=${PWD}/etc/systemd/user install
+      - name: cleanup-plain
+        run: bmake clean
+
+      - name: configure-openrc
+        run: /bin/sh configure --enable-openrc
+
+      - name: compile-openrc
+        run: bmake
 
       - name: install-openrc
-        run: mkcmake RC=openrc PREFIX=${PWD}/usr RCDIR=${PWD}/etc/user/init.d install
+        run: sudo bmake install
+
+      - name: cleanup-openrc
+        run: bmake clean
+
+      - name: configure-systemd
+        run: /bin/sh configure --enable-systemd
+
+      - name: compile-systemd
+        run: bmake
+
+      - name: install-systemd
+        run: sudo bmake install
 

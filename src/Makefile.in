@@ -1,0 +1,14 @@
+PROG=		mbimapidle
+PREFIX=		@PREFIX@
+BINDIR=		@BINDIR@
+MAN=
+CC=		@CC@
+
+SRCS= main.c mbox.c imap.c base64.c common.c
+MK_INSTALL_AS_USER=yes
+
+CFLAGS+=@CFLAGS@
+LDADD+=@LIBS@
+
+.include "progs.mk"
+

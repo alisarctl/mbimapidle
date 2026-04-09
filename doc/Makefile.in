@@ -1,0 +1,6 @@
+FILESDIR=@DOCDIR@
+FILES_COPY=
+FILES= ../README.md NEWS LICENSE mbimapidlerc
+
+.include <prog.mk>
+

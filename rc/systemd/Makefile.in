@@ -1,0 +1,14 @@
+SYSTEMD_USER_DIR=@SYSTEMD_USER_DIR@
+
+conf_install:
+.if !empty(SYSTEMD_USER_DIR)
+	sed -e 's|@BINDIR[@]|@BINDIR@|g' mbimapidle.in > mbimapidle
+	install -d -m 0755 @SYSTEMD_USER_DIR@
+	install -m 0755 mbimapidle @SYSTEMD_USER_DIR@
+	rm -f mbimapidle
+.endif
+
+install: conf_install
+
+.include <prog.mk>
+
