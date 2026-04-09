@@ -116,7 +116,7 @@ static void mbox_proc(struct mbox*m)
 			/* FIXME: Maybe an option to print sync command output */
 			if (background && debug) {
 				ssize_t nbytes = 0;
-				size_t rc = 0;
+				ssize_t rc = 0;
 				char msg[256];
 
 				ioctl(m->sync_cmd_stdout, FIONREAD, &nbytes);
@@ -138,7 +138,7 @@ static void mbox_proc(struct mbox*m)
 		int status = 0;
 		if (waitpid(m->pass_pid, &status, WNOHANG) == m->pass_pid) {
 			ssize_t nbytes = 0;
-			size_t rc = 0;
+			ssize_t rc = 0;
 
 			if (status != 0) {
 				mlog(LOG_ERR,
