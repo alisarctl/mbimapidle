@@ -189,8 +189,8 @@ static bool imap_is_capability(struct mbox *m)
 static unsigned int imap_is_new_message (const char *val, size_t len) {
 	unsigned int num = 0;
 
-	for (int i = 0; i < len; i++) {
-		int next_space = -1;
+	for (size_t i = 0; i < len; i++) {
+		size_t next_space = -1;
 		/* Search for a '*' */
 		if (val[i] == '*') {
 			int star_pos = i;
@@ -203,7 +203,7 @@ static unsigned int imap_is_new_message (const char *val, size_t len) {
 			/* Always check we have enough in len */
 			if (i + 2 < len) {
 				/* Skip all characters until we get a space */
-				for (int j = i + 2; j < len; j++) {
+				for (size_t j = i + 2; j < len; j++) {
 					if (isspace(val[j])) {
 						next_space = j;
 						break;
@@ -219,7 +219,7 @@ static unsigned int imap_is_new_message (const char *val, size_t len) {
 						/* We have now '* XXXX RECENT'
 						 * Check that XXXX are all digits before
 						 * parsing with sscanf*/
-						for (int j = star_pos + 2; j < next_space; j++) {
+						for (size_t j = star_pos + 2; j < next_space; j++) {
 							if (!isdigit(val[j])) {
 								skip = 1;
 							}
@@ -543,7 +543,7 @@ static void mbox_starttls(struct mbox *m)
 	sprintf(msg, "A%010d STARTTLS\r\n", ++m->tag);
 	rc = send(m->sock, msg, strlen(msg), 0);
 
-	if (rc != strlen(msg)) {
+	if (rc == -1 || (size_t)rc != strlen(msg)) {
 		mlog(LOG_INFO, "'%s' Failed to send starttls\n", m->name);
 		handle_failure(m);
 	} else {
@@ -580,7 +580,7 @@ end:
 static bool mbox_write(struct mbox *m, char *msg)
 {
 	bool ret = false;
-	size_t written = 0;
+	ssize_t written = 0;
 
 	while (main_loop_running) {
 		written += send(m->sock, msg + written, strlen(msg) - written, MSG_DONTWAIT);
@@ -588,7 +588,7 @@ static bool mbox_write(struct mbox *m, char *msg)
 			mlog(LOG_ERR, "'%s' Failed to send message to the server\n", m->name);
 			break;
 		}
-		if (written == strlen(msg)) {
+		if (written == (ssize_t)strlen(msg)) {
 			ret = true;
 			break;
 		}
