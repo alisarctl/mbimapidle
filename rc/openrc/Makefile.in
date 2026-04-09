@@ -1,0 +1,13 @@
+OPENRC_USER_DIR=@OPENRC_USER_DIR@
+
+conf_install:
+.if !empty(OPENRC_USER_DIR)
+	sed -e 's|@BINDIR[@]|@BINDIR@|g' mbimapidle.in > mbimapidle
+	install -d -m 0755 @OPENRC_USER_DIR@
+	install -m 0755 mbimapidle @OPENRC_USER_DIR@
+	rm -f mbimapidle
+.endif
+
+install: ${install} conf_install
+
+.include <bsd.prog.mk>

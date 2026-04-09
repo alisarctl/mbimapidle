@@ -1,0 +1,309 @@
+#!/bin/sh
+# Copyright (c) 2026, Ali Abdallah <ali.abdallah@suse.com>
+#
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#     * Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#     * Redistributions in binary form must reproduce the above copyright
+#       notice, this list of conditions and the following disclaimer in the
+#       documentation and/or other materials provided with the distribution.
+#     * Neither the name of the <organization> nor the
+#       names of its contributors may be used to endorse or promote products
+#       derived from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL <COPYRIGHT HOLDER> BE LIABLE FOR ANY
+# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+set -e
+
+PROJECT="mbimapidle"
+VERSION="0.92"
+RELEASE="0"
+
+if test "$RELEASE" -eq 0; then
+	GIT_REV=$(git describe --abbrev=7 --dirty --always)
+	VERSION=${VERSION}-${GIT_REV}
+fi
+
+prefix=/usr/local
+sysconfdir=${prefix}/etc
+bindir=${prefix}/bin
+mandir=${prefix}/share/man
+datadir=${prefix}/share
+docdir=${datadir}/doc/${PROJECT}
+
+REQUIRE_HEADERS="ctype.h limits.h libgen.h netdb.h fcntl.h unistd.h errno.h"
+REQUIRE_HEADERS="${REQUIRE_HEADERS} syslog.h sys/socket.h arpa/inet.h netinet/in.h sys/queue.h"
+REQUIRE_HEADERS="${REQUIRE_HEADERS} sys/select.h sys/ioctl.h sys/stat.h sys/wait.h getopt.h"
+REQUIRE_HEADERS="${REQUIRE_HEADERS} assert.h signal.h"
+OPTIONAL_HEADERS=""
+
+REQUIRED_DEFINES=""
+OPTIONAL_DEFINES=""
+
+CFLAGS="${CFLAGS} -DVERSION='\"${VERSION}\"' -DPROG='\"${PROJECT}\"' -Wall -Wextra"
+LIBS="${LIBS}"
+
+CMAIN="int main(int argc, char **argv) {return 0;}"
+
+check_c_compiler()
+{
+	echo -n "checking C '${CC}' compiler... "
+	if echo "${CMAIN}" | ${CC} -o /dev/null -xc - > /dev/null 2>&1; then
+		echo "okay"
+	else
+		echo "'${CC}' is unable to produce executable or not found"
+		exit 1
+	fi
+}
+
+check_pkgconfig()
+{
+	echo -n "checking for pkgconfig... "
+	if pkg-config --about > /dev/null 2>&1; then
+		echo "found"
+	else
+		echo "not found"
+		exit 1
+	fi
+}
+
+pkgconfig_check()
+{
+	echo -n "checking [pkg-config] check for $1... "
+	if pkg-config --validate $1 > /dev/null 2>&1; then
+		cflags=`pkg-config --cflags $1`
+		libs=`pkg-config --libs $1`
+		echo "found"
+		echo "checking [pkg-config] $1 cflags + ${cflags}"
+		echo "checking [pkg-config] $1 libs + ${libs}"
+		CFLAGS="${CFLAGS} ${cflags}"
+		LIBS="${LIBS} ${libs}"
+	else
+		echo "not found"
+		if test $2 -eq 1; then
+			exit 1
+		fi
+	fi
+}
+
+check_header()
+{
+	echo -n "checking [header] $1..."
+	if echo "#include <$1>" | ${CC} -E -xc - > /dev/null 2>&1; then
+		have=$1
+		have=$(echo $have | tr 'a-z' 'A-Z')
+		have=$(echo $have | tr ./ _)
+		have="HAVE_${have}"
+		echo "found ${have}"
+	else
+		echo "not found"
+		if test $2 -eq 1; then
+			exit 1
+		fi
+	fi
+}
+
+check_define()
+{
+	printf "checking [define] $1..."
+	if ! printf "#ifdef $1\n .\n#endif\n${CMAIN}" | ${CC} -o /dev/null -xc - > /dev/null 2>&1; then
+		echo "found"
+	else
+		echo "not found"
+		if test $2 -eq 1; then
+			exit 1
+		fi
+	fi
+}
+
+show_help()
+{
+	echo
+	echo "Configuration options:"
+	echo "	--prefix=DIR				default ${prefix}"
+	echo "	--sysconfdir=PREFIX/etc			default ${sysconfdir}"
+	echo "	--bindir=PREFIX/bin			default ${bindir}"
+	echo "	--datadir=PREFIX/share			default ${datadir}"
+	echo "	--mandir=PREFIX/share/man		default ${mandir}"
+	echo "	--docdir=PREFIX/share/doc		default ${docdir}"
+	echo "	--enable-openrc				install openrc user service file, default no"
+	echo "	--enable-systemd			install systemd user service file, default no"
+	echo "	--systemduserdir=			${sysconfdir}/systemd/user"
+	echo "	--openrcuserdir=			${sysconfdir}/user/init.d"
+	echo "	--enable-debug				build with debugging symbols, default no"
+	echo
+	echo "Environment variables:"
+	echo "	CC	C compiler to use"
+	echo "	CFLAGS	C compiler flags"
+	echo "	LIBS	libraries to pass to the linker"
+	echo
+}
+
+while :; do
+	case $1 in
+		-h|-\?|--help)
+			show_help
+			exit
+			;;
+		--prefix=*)
+			opt_prefix="${1#*=}"
+			;;
+		--sysconfdir=*)
+			opt_sysconfdir="${1#*=}"
+			;;
+		--bindir=*)
+			opt_bindir="${1#*=}"
+			;;
+		--datadir=*)
+			opt_datadir="${1#*=}"
+			;;
+		--mandir=*)
+			opt_mandir="${1#*=}"
+			;;
+		--docdir=*)
+			opt_docdir="${1#*=}"
+			;;
+		--enable-systemd)
+			opt_systemd=1
+			;;
+		--systemduserdir=*)
+			opt_systemduserdir="${1#*=}"
+			;;
+		--openrcuserdir=*)
+			opt_openrcuserdir="${1#*=}"
+			;;
+		--enable-openrc)
+			opt_openrc=1
+			;;
+		--enable-debug)
+			opt_debug=1
+			;;
+		--)
+			break
+			;;
+		'')
+			break
+			;;
+		*)
+			echo "Option '$1' is not recognized"
+			exit 1
+			;;
+	esac
+	shift
+done
+
+test ! -n "${CC}" && CC="cc"
+
+check_c_compiler
+check_pkgconfig
+
+pkgconfig_check libssl 1
+pkgconfig_check libcrypto 1
+
+for h in $REQUIRE_HEADERS; do
+	check_header $h 1
+done
+
+for h in $OPTIONAL_HEADERS; do
+	check_header $h 0
+done
+
+for d in $REQUIRE_DEFINES; do
+	check_define $d 1
+done
+
+for d in $OPTIONAL_DEFINES; do
+	check_define $d 1
+done
+
+prefix="/usr/local"
+
+test -n "$opt_prefix" && prefix=$opt_prefix
+
+# Re-evaluate install variables here
+bindir=${prefix}/bin
+sysconfdir=${prefix}/etc
+mandir=${prefix}/share/man
+datadir=${prefix}/share
+docdir=${datadir}/doc/${PROJECT}
+
+test -n "$opt_bindir" && bindir=$opt_bindir
+test -n "$opt_sysconfdir" && sysconfdir=$opt_sysconfdir
+test -n "$opt_mandir" && mandir=$opt_mandir
+test -n "$opt_datadir" && datadir=$opt_datadir
+test -n "$opt_docdir" && docdir=$opt_docdir
+
+if test -n "$opt_debug"; then
+	CFLAGS="$CFLAGS -g -ggdb"
+	debug=$opt_debug
+fi
+
+if test -n "$opt_openrc"; then
+	openrcuserdir=${sysconfdir}/user/init.d/
+	test -n "$opt_openrcuserdir" && openrcuserdir=$opt_openrcuserdir
+fi
+
+if test -n "$opt_systemd"; then
+	systemduserdir=${sysconfdir}/systemd/user
+	test -n "$opt_systemduserdir" && systemduserdir=$opt_systemduserdir
+fi
+
+mkfile=$(find . -type f -name Makefile.in)
+for m in $mkfile; do
+	# Set default bmake options
+	dname=$(dirname $m)
+	bname=$(basename $m .in)
+	echo "# Generated by configure, don't edit this file" > ${dname}/${bname}
+	echo "# Edit Makefile.in instead and re-run the configure script" >> ${dname}/${bname}
+	echo "MK_INSTALL_AS_USER=yes" >> ${dname}/${bname}
+	sed -e	's|@PREFIX@|'"${prefix}"'|g'		\
+		-e	's|@BINDIR@|'"${bindir}"'|g'			\
+		-e	's|@DATADIR@|'"${datadir}"'|g'			\
+		-e	's|@MANDIR@|'"${mandir}"'|g'			\
+		-e	's|@DOCDIR@|'"${docdir}"'|g'			\
+		-e	's|@CFLAGS@|'"${CFLAGS}"'|g'			\
+		-e	's|@LIBS@|'"${LIBS}"'|g'			\
+		-e	's|@PROJECT@|'"${PROJECT}"'|g'			\
+		-e	's|@VERSION@|'"${VERSION}"'|g'			\
+		-e	's|@CC@|'"${CC}"'|g'				\
+		-e	's|@SYSTEMD_USER_DIR@|'"${systemduserdir}"'|g'	\
+		-e	's|@OPENRC_USER_DIR@|'"${openrcuserdir}"'|g'	\
+		$m >> ${dname}/${bname}
+done
+
+echo
+echo "configuration done:"
+echo
+echo "	prefix		${prefix}"
+echo "	sysconfdir	${sysconfdir}"
+echo "	bindir		${bindir}"
+echo "	datadir		${datadir}"
+echo "	mandir		${mandir}"
+echo "	docdir		${docdir}"
+if test -n "$opt_openrc" 2>/dev/null; then
+echo "	openrcuserdir	${openrcuserdir}"
+fi
+if test -n "$opt_systemd" 2>/dev/null; then
+echo "	systemduserdir	${systemduserdir}"
+fi
+if test -n "$debug" 2>/dev/null; then
+	echo "	debug		enabled"
+fi
+echo
+echo "C compiler '$CC'"
+echo
+echo "type 'bmake' to compile"
+echo
+

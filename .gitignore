@@ -1,8 +1,9 @@
 mbimapidle
 *.o
 *.d
-mk-cache
 release.sh
 *.swp
 *.tar.gz
+.depend
+Makefile
 man/mbimapidle.1

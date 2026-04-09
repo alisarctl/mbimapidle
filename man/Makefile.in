@@ -1,7 +1,8 @@
 MAN=		mbimapidle.1
-MANDIR?=	${PREFIX}/share/man
-DOCDIR?=	${DATADIR}/doc/${PROG_NAME}
-CONF_EXAMPLE=	${DOCDIR}/mbimapidlerc
+MANDIR=		@MANDIR@
+DOCDIR=		@DATADIR@/doc/@PROJECT@
+CONF_EXAMPLE=	@DOCDIR@/mbimapidlerc
+VERSION=	@VERSION@
 
 TODAY != date "+%B %d, %Y"
 
@@ -11,8 +12,9 @@ mbimapidle.1: mbimapidle.1.in Makefile
 	     -e 's|@CONF_EXAMPLE[@]|'${CONF_EXAMPLE}'|g' \
 	mbimapidle.1.in > mbimapidle.1
 
-.include "../inc.mk"
-.include <mkc.prog.mk>
-
-clean:
+clean_man:
 	rm -f mbimapidle.1
+
+.include <bsd.prog.mk>
+
+clean: ${clean} clean_man
