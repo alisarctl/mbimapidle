@@ -1,4 +1,10 @@
-0.91 (2026-04-03
+0.92 (2026-04-09)
+=================
+- Implement a customer configure script
+- Silence (all) compiler warnings
+- Documentation updates
+
+0.91 (2026-04-03)
 =================
 - Reduce binary size by making mlog a not inlined function.
 - Cleanups
