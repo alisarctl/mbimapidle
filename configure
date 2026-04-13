@@ -28,8 +28,8 @@
 set -e
 
 PROJECT="mbimapidle"
-VERSION="0.92"
-RELEASE="1"
+VERSION="0.93"
+RELEASE="0"
 
 if test "$RELEASE" -eq 0; then
 	GIT_REV=$(git describe --abbrev=7 --dirty --always)
@@ -43,13 +43,20 @@ mandir=${prefix}/share/man
 datadir=${prefix}/share
 docdir=${datadir}/doc/${PROJECT}
 
+WARN="-Wno-deprecated -Wshadow -fstack-protector -Wstack-protector -Wreturn-type"
+WARN="${WARN} -Wwrite-strings -Wunused-result -Wuse-after-free -Walloc-zero"
+WARN="${WARN} -Wformat-security -Wunused-macros -Wvariadic-macros -Wundef"
+WARN="${WARN} -Wstrict-prototypes -Wredundant-decls -Woverlength-strings -Wnull-dereference"
+WARN="${WARN} -Wnested-externs -Wdate-time -Walloc-zero -Wduplicated-branches -Wduplicated-cond"
+WARN="${WARN} -Wdisabled-optimization -Winline -Wjump-misses-init -Wconversion"
+
 REQUIRE_HEADERS="ctype.h limits.h libgen.h netdb.h fcntl.h unistd.h errno.h"
 REQUIRE_HEADERS="${REQUIRE_HEADERS} syslog.h sys/socket.h arpa/inet.h netinet/in.h sys/queue.h"
 REQUIRE_HEADERS="${REQUIRE_HEADERS} sys/select.h sys/ioctl.h sys/stat.h sys/wait.h getopt.h"
 REQUIRE_HEADERS="${REQUIRE_HEADERS} assert.h signal.h"
 OPTIONAL_HEADERS=""
 
-REQUIRED_DEFINES=""
+REQUIRE_DEFINES=""
 OPTIONAL_DEFINES=""
 
 CFLAGS="${CFLAGS} -DVERSION='\"${VERSION}\"' -DPROG='\"${PROJECT}\"' -Wall -Wextra"
@@ -65,6 +72,20 @@ check_c_compiler()
 	else
 		echo "'${CC}' is unable to produce executable or not found"
 		exit 1
+	fi
+}
+
+check_c_warn()
+{
+	echo -n "checking if '${CC}' accepts ${1}... "
+	out=$(echo "${CMAIN}" | ${CC} ${1} -o /dev/null -xc - ) 2>.cc-check-$1
+	err=$(cat .cc-check-$1)
+	rm .cc-check-${1}
+	if ! test -n "$err"; then
+		echo "yes"
+		CFLAGS="$CFLAGS $1"
+	else
+		echo "no"
 	fi
 }
 
@@ -151,6 +172,13 @@ show_help()
 	echo
 }
 
+if test "$0" != "./configure"; then
+	echo "ERR: configure script can only be executed from the top level source directory"
+	exit 1
+fi
+
+rm -f .mk-dep
+
 while :; do
 	case $1 in
 		-h|-\?|--help)
@@ -204,9 +232,15 @@ while :; do
 	shift
 done
 
+topdir=$(pwd)
+CFLAGS="$CFLAGS -I ${topdir}"
+
 test ! -n "${CC}" && CC="cc"
 
 check_c_compiler
+for w in $WARN; do
+	check_c_warn $w
+done
 check_pkgconfig
 
 pkgconfig_check libssl 1
@@ -261,6 +295,7 @@ if test -n "$opt_systemd"; then
 fi
 
 mkfile=$(find . -type f -name Makefile.in)
+distclean=""
 for m in $mkfile; do
 	# Set default bmake options
 	dname=$(dirname $m)
@@ -281,6 +316,21 @@ for m in $mkfile; do
 		-e	's|@SYSTEMD_USER_DIR@|'"${systemduserdir}"'|g'	\
 		-e	's|@OPENRC_USER_DIR@|'"${openrcuserdir}"'|g'	\
 		$m >> ${dname}/${bname}
+
+	distclean="${distclean}\trm -f ${dname}/.mk-dep\n\trm -f ${dname}/Makefile\n"
+	# Add dependency on each generated Makefile to Makefile.in
+	# so we re-run the configure script when Makefile.in change
+	printf "\nall: \${all} .mk-dep
+.mk-dep: Makefile.in
+	sh .mk-dep\n" >> ${dname}/${bname}
+
+	printf "#!/bin/sh
+set -x -e
+saved_pwd=\$(pwd)
+cd $topdir
+./configure ${conf_args}
+cd \${saved_pwd}
+bmake\n" > ${dname}/.mk-dep
 done
 
 echo
@@ -306,4 +356,11 @@ echo "C compiler '$CC'"
 echo
 echo "type 'bmake' to compile"
 echo
+
+printf "#!/bin/sh
+$0 ${conf_args}
+bmake\n" > .mk-dep
+
+	printf "\ndistclean: .PHONY
+	bmake clean \n$distclean" >> Makefile
 
