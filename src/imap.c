@@ -54,8 +54,10 @@ extern volatile int main_loop_running;
 static SSL_CTX *ssl_ctx = NULL;
 #define RESET_BUFFER(m) memset(m->buf, 0, m->buf_size); m->buf_len = 0;
 
-#define IMAP_TAG     "A%010d "
-#define IMAP_TAG_STR "AXXXXXXXXXX "
+/**
+ * IMAP_TAG     "A%010d "
+ * IMAP_TAG_STR "AXXXXXXXXXX "
+ */
 #define IMAP_TAG_STR_LEN 12
 
 static inline void handle_failure(struct mbox *m)
@@ -190,10 +192,10 @@ static unsigned int imap_is_new_message (const char *val, size_t len) {
 	unsigned int num = 0;
 
 	for (size_t i = 0; i < len; i++) {
-		size_t next_space = -1;
+		size_t next_space = 0;
 		/* Search for a '*' */
 		if (val[i] == '*') {
-			int star_pos = i;
+			size_t star_pos = i;
 
 			/* We have it, make sure next char is a space, if not skip it*/
 			if (i + 1 < len && !isspace(val[i+1])) {
@@ -210,7 +212,7 @@ static unsigned int imap_is_new_message (const char *val, size_t len) {
 					}
 				}
 
-				if (next_space > 0) {
+				if (next_space != 0) {
 					/* Now we have '* XXXXX '
 					   Check to see what comes next if ' RECENT'
 					   */
@@ -298,8 +300,8 @@ static void mbox_connect (struct mbox *m)
 
 static bool mbox_read_socket (struct mbox *m, bool block)
 {
-	int idx = 0;
-	int rc;
+	size_t idx = 0;
+	ssize_t rc;
 	bool ret = false;
 
 	idx = m->buf_len;
@@ -328,7 +330,7 @@ static bool mbox_read_socket (struct mbox *m, bool block)
 				break;
 			}
 		} else {
-			idx += rc;
+			idx += (size_t)rc;
 			if (m->buf[idx - 1] == '\n' && m->buf[idx - 2] == '\r') {
 				m->buf[idx - 2] = '\0';
 				m->buf_len = idx - 2;
@@ -583,7 +585,7 @@ static bool mbox_write(struct mbox *m, char *msg)
 	ssize_t written = 0;
 
 	while (main_loop_running) {
-		written += send(m->sock, msg + written, strlen(msg) - written, MSG_DONTWAIT);
+		written += send(m->sock, msg + written, strlen(msg) - (size_t)written, MSG_DONTWAIT);
 		if (written == -1) {
 			mlog(LOG_ERR, "'%s' Failed to send message to the server\n", m->name);
 			break;
@@ -601,7 +603,7 @@ static bool mbox_authenticate(struct mbox *m)
 	char *msg, *xoauth;
 	char *b64;
 	bool ret;
-	int b64_len = 0;
+	size_t b64_len = 0;
 
 	if (m->auth_type == AUTH_TYPE_PLAIN) {
 		msg = strdup_printf("A%010d LOGIN \"%s\" \"%s\"\r\n",

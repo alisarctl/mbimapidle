@@ -39,10 +39,8 @@
 
 #define CONFIG_FNAME "mbimapidlerc"
 #define CONFIG_DNAME "mbimapidle"
-#define CONFIG_FIFO  "mbimapidle"
 
 extern bool log_to_syslog;
-extern bool debug;
 
 static char *get_conf_dir_path(void)
 {
@@ -171,7 +169,7 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 	/* Parse arguments */
 	do {if (isspace(*sub)) nargs++;} while(*sub++);
 
-	args = malloc(sizeof(char *) * (nargs + 2));
+	args = malloc(sizeof(char *) * (long unsigned int)(nargs + 2));
 	for (sub = strtok_r(basen, " ", &brkb);
 			sub;
 			sub = strtok_r(NULL, " ", &brkb)) {

@@ -36,7 +36,7 @@
 
 #include "base64.h"
 
-char *b64_encode(const char *input, int *b64_len)
+char *b64_encode(const char *input, size_t *b64_len)
 {
 	char *buff;
 	BIO *bmem, *b64;
@@ -49,7 +49,7 @@ char *b64_encode(const char *input, int *b64_len)
 	bmem = BIO_new(BIO_s_mem());
 	bmem = BIO_push(b64, bmem);
 
-	BIO_write(b64, input, strlen(input));
+	BIO_write(b64, input, (int)strlen(input));
 	BIO_flush(b64);
 
 	BIO_get_mem_ptr(b64, &bptr);
@@ -65,7 +65,7 @@ char *b64_encode(const char *input, int *b64_len)
 	return buff;
 }
 
-char *b64_decode(const char *input, int b64_len)
+char *b64_decode(const char *input, size_t b64_len)
 {
 	char *buff;
 	BIO *bmem, *b64;
@@ -78,9 +78,9 @@ char *b64_decode(const char *input, int b64_len)
 	bmem = BIO_new(BIO_s_mem());
 	bmem = BIO_push(b64, bmem);
 
-	BIO_write(bmem, input, b64_len);
+	BIO_write(bmem, input, (int)b64_len);
 	BIO_flush(bmem);
-	BIO_read(b64, (void*)buff, b64_len);
+	BIO_read(b64, (void*)buff, (int)b64_len);
 
 	BIO_free_all(b64);
 

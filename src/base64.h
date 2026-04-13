@@ -29,8 +29,8 @@
 #ifndef __M__BASE64__H
 #define __M__BASE64__H
 
-char *b64_encode(const char *input, int *b64_len);
-char *b64_decode(const char *input, int b64_len);
+char *b64_encode(const char *input, size_t *b64_len);
+char *b64_decode(const char *input, size_t b64_len);
 
 
 #endif /* __M__BASE64__H*/

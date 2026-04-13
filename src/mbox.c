@@ -41,8 +41,6 @@
 #include "mbox.h"
 #include "common.h"
 
-#define CONFIG_FNAME "mbimapidlerc"
-
 TAILQ_HEAD(tailhead, mbox) mbox_head;
 
 static char* trim(char *str)
@@ -65,7 +63,7 @@ static bool check_key_value(char *line, char **key, char **val)
 	uint32_t quote2_pos = 0;
 	bool eq_found = false;
 	bool val_found = false;
-	int idx = 0;
+	uint32_t idx = 0;
 
 	/* Sanity checks */
 	if (line[idx] == '=' || line[idx] == '[' || line[idx] == ']')
@@ -171,7 +169,7 @@ static bool validate_block_config(struct mbox *m, char *key, char *val)
 	}
 
 	if (!strncmp(key, "port", 4)) {
-		m->port = strtoimax(val, NULL, 10);
+		m->port = (uint16_t)strtoimax(val, NULL, 10);
 		if (m->port == 0) {
 			mlog(LOG_ERR,"Invalid port format for '%s'\n", m->name);
 			return false;
@@ -180,7 +178,7 @@ static bool validate_block_config(struct mbox *m, char *key, char *val)
 	}
 
 	if (!strncmp(key, "idle_timeout", 12)) {
-		m->idle_timeout = strtoimax(val, NULL, 10);
+		m->idle_timeout = (uint32_t)strtoimax(val, NULL, 10);
 		if (m->idle_timeout < 5 || m->idle_timeout > 29) {
 			mlog(LOG_ERR,"'%s' idle_timeout allowed values >= 5m and <= 29m \n", m->name);
 			return false;
@@ -338,8 +336,8 @@ bool conf_init(void)
 		int i = 0;
 		linenum++;
 		idx = 0;
-		p = malloc(rc);
-		memset(p, 0, rc);
+		p = malloc((size_t)rc);
+		memset(p, 0, (size_t)rc);
 		if (rc == 1 && line[0] == '\n') {
 			FREE_STR(p);
 			continue;

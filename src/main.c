@@ -123,7 +123,7 @@ static void mbox_proc(struct mbox*m)
 
 				do {
 					memset(msg, 0, sizeof(msg));
-					rc += read(m->sync_cmd_stdout, msg, MIN(nbytes - rc, 255));
+					rc += read(m->sync_cmd_stdout, msg, MIN((size_t)(nbytes - rc), 255));
 					mlog(LOG_DEBUG, "Sync: '%s' '%s'\n", m->name, msg);
 				} while (rc < nbytes);
 
@@ -150,18 +150,28 @@ static void mbox_proc(struct mbox*m)
 				goto disable;
 			}
 
-			ioctl(m->pass_pipe_fd, FIONREAD, &nbytes);
+			if ((ioctl(m->pass_pipe_fd, FIONREAD, &nbytes) == -1)) {
+				mlog(LOG_ERR, "'%s' ioctl failed : %s\n", strerror(errno));
+				goto out;
+			}
 
 			if (nbytes > MAX_PASS_TOKEN_LEN - 1) {
 				mlog(LOG_ERR, "'%s' password token is too long\n", m->name);
 				goto disable;
 			}
+
+			/* Make sure we have a positive nbytes values */
+			if (nbytes <= 0) {
+				mlog(LOG_ERR, "'%s' password token unexpected length %d\n", nbytes);
+				goto out;
+			}
+
 			FREE_STR(m->password);
-			m->password = malloc(nbytes + 1);
-			memset (m->password, 0, nbytes + 1);
+			m->password = malloc((size_t)(nbytes + 1));
+			memset (m->password, 0, (size_t)(nbytes + 1));
 
 			do {
-				rc += read(m->pass_pipe_fd, m->password + rc, nbytes - rc);
+				rc += read(m->pass_pipe_fd, m->password + rc, (size_t)(nbytes - rc));
 				if (rc == -1) {
 					mlog(LOG_ERR, "unexpected end of read '%s'\n", strerror(errno));
 					goto disable;
@@ -179,6 +189,7 @@ disable:
 out:
 			m->pass_pid = 0;
 			close(m->pass_pipe_fd);
+			m->pass_pipe_fd = 0;
 		}
 
 	}
