@@ -91,15 +91,16 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 {
 	char **args;
 	char *path, *sub, *brkb, *dirn, *basen;
-	char *tmp = NULL;
+	const char *env_path, *home;
+	char *tmp = NULL, *tmp_val = NULL;
 	size_t cmd_len = 0;
 	int idx = 0;
 	int nargs = 0;
 	bool found_in_path = false;
 	bool ret = false;
 
-	path = getenv("PATH");
-	if (path == NULL) {
+	env_path = getenv("PATH");
+	if (env_path == NULL) {
 		mlog(LOG_ERR, "PATH is not set\n");
 		return false;
 	}
@@ -128,8 +129,22 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 		return false;
 	}
 
-	path = strdup(path);
-	tmp = strdup(val);
+	path = strdup(env_path);
+	tmp_val = strdup(val);
+	sub = tmp_val;
+	do {
+		if (isspace(*sub)) {
+			*sub = '\0';
+			break;
+		}
+	} while(*sub++);
+
+	tmp = realpath(tmp_val, NULL);
+	FREE_STR(tmp_val);
+	if (tmp == NULL) {
+		mlog(LOG_ERR, "'%s' invalid path '%s' \n", mbox_name, val);
+		goto out;
+	}
 	dirn = dirname(tmp);
 
 	if (strlen(dirn) > strlen(path)) {
@@ -148,6 +163,13 @@ bool parse_cmd (const char *mbox_name, char *val, char **cmd, char **argv[])
 		}
 	}
 	FREE_STR(path);
+
+	/* Check if command is in user home directory */
+	if (!found_in_path) {
+		home = getenv("HOME");
+		if (strncmp(dirn, home, strlen(home)) == 0)
+			found_in_path = true;
+	}
 
 	if (!found_in_path) {
 		mlog(LOG_ERR, "'%s' command '%s' not found in $PATH\n",
