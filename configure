@@ -48,7 +48,7 @@ WARN="${WARN} -Wwrite-strings -Wunused-result -Wuse-after-free -Walloc-zero"
 WARN="${WARN} -Wformat-security -Wunused-macros -Wvariadic-macros -Wundef"
 WARN="${WARN} -Wstrict-prototypes -Wredundant-decls -Woverlength-strings -Wnull-dereference"
 WARN="${WARN} -Wnested-externs -Wdate-time -Walloc-zero -Wduplicated-branches -Wduplicated-cond"
-WARN="${WARN} -Wdisabled-optimization -Winline -Wjump-misses-init -Wconversion"
+WARN="${WARN} -Wdisabled-optimization -Wjump-misses-init -Wconversion"
 
 REQUIRE_HEADERS="ctype.h limits.h libgen.h netdb.h fcntl.h unistd.h errno.h"
 REQUIRE_HEADERS="${REQUIRE_HEADERS} syslog.h sys/socket.h arpa/inet.h netinet/in.h sys/queue.h"
@@ -280,8 +280,10 @@ test -n "$opt_datadir" && datadir=$opt_datadir
 test -n "$opt_docdir" && docdir=$opt_docdir
 
 if test -n "$opt_debug"; then
-	CFLAGS="$CFLAGS -g -ggdb"
+	CFLAGS="$CFLAGS -g -ggdb -Og"
 	debug=$opt_debug
+else
+	CFLAGS="$CFLAGS -O1"
 fi
 
 if test -n "$opt_openrc"; then
@@ -328,7 +330,7 @@ for m in $mkfile; do
 set -x -e
 saved_pwd=\$(pwd)
 cd $topdir
-./configure ${conf_args}
+CC=$CC ./configure ${conf_args}
 cd \${saved_pwd}
 bmake\n" > ${dname}/.mk-dep
 done
@@ -358,7 +360,7 @@ echo "type 'bmake' to compile"
 echo
 
 printf "#!/bin/sh
-$0 ${conf_args}
+CC=$CC $0 ${conf_args}
 bmake\n" > .mk-dep
 
 	printf "\ndistclean: .PHONY
