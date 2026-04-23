@@ -29,7 +29,7 @@ set -e
 
 PROJECT="mbimapidle"
 VERSION="0.93"
-RELEASE="0"
+RELEASE="1"
 
 if test "$RELEASE" -eq 0; then
 	GIT_REV=$(git describe --abbrev=7 --dirty --always)
@@ -172,7 +172,7 @@ show_help()
 	echo
 }
 
-if test "$0" != "./configure"; then
+if test "$0" != "./configure" && test "$0" != "configure"; then
 	echo "ERR: configure script can only be executed from the top level source directory"
 	exit 1
 fi

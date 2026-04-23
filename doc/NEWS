@@ -1,6 +1,12 @@
+0.93 (2026-04-23)
+=================
+- Allow command in user home directory
+- Fix more (relevant) compiler warnings
+- Use a better progs.mk bmake file for building
+
 0.92 (2026-04-09)
 =================
-- Implement a customer configure script
+- Implement a custom configure script
 - Silence (all) compiler warnings
 - Documentation updates
 
