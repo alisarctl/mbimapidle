@@ -78,7 +78,7 @@ check_c_compiler()
 check_c_warn()
 {
 	echo -n "checking if '${CC}' accepts ${1}... "
-	out=$(echo "${CMAIN}" | ${CC} ${1} -o /dev/null -xc - ) 2>.cc-check-$1
+	echo "${CMAIN}" | ${CC} ${1} -o /dev/null -xc - >.cc-check-$1 2>&1
 	err=$(cat .cc-check-$1)
 	rm .cc-check-${1}
 	if ! test -n "$err"; then
