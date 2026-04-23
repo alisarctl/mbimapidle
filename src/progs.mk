@@ -25,7 +25,7 @@
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
 # Updated 13-April 2026
-#
+
 all: ${PROGS}
 
 BINMODE?= 555
@@ -45,7 +45,7 @@ OBJS: ${SRCS}
 DEPS+=.depend
 
 .for o in ${OBJS}
-${o}: Makefile
+${o}: Makefile .depend
 .endfor
 .endif
 
@@ -63,7 +63,7 @@ DEPS+=.depend.${p}
 	${CC} ${CFLAGS} -c ${.IMPSRC} -o ${.TARGET}
 
 .for o in ${OBJS.${p}}
-${o}: Makefile
+${o}: Makefile .depend.${p}
 .endfor
 
 ${p}: ${OBJS.${p}} ${OBJS}

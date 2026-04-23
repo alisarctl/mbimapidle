@@ -4,7 +4,7 @@ mbimapidle
 release.sh
 *.swp
 *.tar.gz
-.depend
+.depend*
 .mk-dep
 Makefile
 man/mbimapidle.1
