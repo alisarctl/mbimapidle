@@ -1,4 +1,5 @@
 mbimapidle
+config.h
 *.o
 *.d
 release.sh
