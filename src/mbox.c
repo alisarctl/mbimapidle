@@ -41,7 +41,7 @@
 #include "mbox.h"
 #include "common.h"
 
-TAILQ_HEAD(tailhead, mbox) mbox_head;
+static TAILQ_HEAD(tailhead, mbox) mbox_head;
 
 static char* trim(char *str)
 {
