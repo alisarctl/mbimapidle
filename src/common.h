@@ -42,6 +42,8 @@ extern bool background;
 #define SEC_MS(x) (x*1000)
 #define MIN2MS(x) (SEC_MS(x)*60)
 
+#define STATE_STUCK_TIMEOUT 20
+
 #define COUNTDOWN(_val,_reset) _val = _val == 0 ? _reset : _val <= TICK_MS ? 0 : _val - TICK_MS
 
 #ifdef MIN

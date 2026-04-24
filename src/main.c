@@ -101,7 +101,7 @@ static void sig_handler(int signum)
 }
 
 #define MAX_PASS_TOKEN_LEN 8192
-static void mbox_proc(struct mbox*m)
+static void mbox_proc_cmd(struct mbox*m)
 {
 	if (m->state == MBOX_DISABLED)
 		return;
@@ -191,9 +191,8 @@ out:
 			close(m->pass_pipe_fd);
 			m->pass_pipe_fd = 0;
 		}
-
 	}
-	mbox_idle_proc(m);
+	mbox_proc(m);
 }
 
 static void mbox_check_state (struct mbox *m)
@@ -201,8 +200,12 @@ static void mbox_check_state (struct mbox *m)
 	if (m->state == MBOX_DISABLED)
 		return;
 
+	/* Delayed connection, skip it */
+	if (m->delay != 0)
+		return;
+
 	if (m->old_state != m->state) {
-		m->state_timeout = SEC_MS(10);
+		m->state_timeout = SEC_MS(STATE_STUCK_TIMEOUT);
 		m->old_state = m->state;
 	} else {
 		COUNTDOWN(m->state_timeout, 0);
@@ -318,8 +321,8 @@ int main(int argc, char *argv[])
 			reload_all = false;
 		}
 
-		/* Process messages/connections/etc.*/
-		mbox_foreach(&mbox_proc);
+		/* Process messages/connections/etc. */
+		mbox_foreach(&mbox_proc_cmd);
 
 		/* Check mbox state */
 		mbox_foreach(&mbox_check_state);

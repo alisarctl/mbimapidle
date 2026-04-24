@@ -37,7 +37,7 @@
 #define CAPS_AUTH_XOAUTH2 (1 << 4)
 #define CAPS_READY        (1 << 5)
 
-void mbox_idle_proc(struct mbox *m);
+void mbox_proc(struct mbox *m);
 bool mbox_init_ssl(void);
 void mbox_shutdown_ssl(struct mbox *m);
 void mbox_free_ssl(void);

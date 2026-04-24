@@ -33,6 +33,7 @@
 #include <stdbool.h>
 #include <ctype.h>
 
+#include <sys/ioctl.h>
 #include <sys/select.h>
 
 #include <openssl/bio.h>
@@ -73,8 +74,9 @@ static inline void handle_failure(struct mbox *m)
 
 	m->delay = SEC_MS(delay);
 	m->delay = (m->delay / 100) * 100;
+	m->delay = MAX(300, m->delay); /* max delay 5 minutes, FIXME, config?*/
 	m->state = MBOX_INIT_CONNECT;
-	m->state_timeout = SEC_MS(20);
+	m->state_timeout = SEC_MS(STATE_STUCK_TIMEOUT);
 }
 
 static bool imap_check_answer(struct mbox *m)
@@ -721,13 +723,36 @@ end:
 
 static bool mbox_read(struct mbox *m, bool block)
 {
-	bool ret;
-	if (m->tls_type == TLS_TYPE_NONE)
-		ret = mbox_read_socket(m, block);
-	else
-		ret = mbox_read_ssl(m, block);
+	bool read_ok;
+	int ret;
+	ssize_t nbytes = 0;
 
-	return ret;
+	ret = ioctl(m->sock, FIONREAD, &nbytes);
+
+	if (ret == -1) {
+		/**
+		 * Log error and process this mbox below
+		 * with mbox_proc to reset the connection
+		 **/
+		mlog(LOG_ERR, "'%s' ioctl failed : %s\n",
+				m->name, strerror(errno));
+		handle_failure(m);
+		return false;
+	} else {
+		/**
+		 * We are idle and we have nothing to read
+		 * so skip this mbox
+		 **/
+		if (nbytes == 0)
+			return false;
+	}
+
+	if (m->tls_type == TLS_TYPE_NONE)
+		read_ok = mbox_read_socket(m, block);
+	else
+		read_ok = mbox_read_ssl(m, block);
+
+	return read_ok;
 }
 
 static bool mbox_select(struct mbox *m)
@@ -819,7 +844,7 @@ static bool mbox_query_caps(struct mbox *m)
 	return ret;
 }
 
-void mbox_idle_proc(struct mbox *m)
+void mbox_proc(struct mbox *m)
 {
 	if (m->state == MBOX_DISABLED)
 		return;
