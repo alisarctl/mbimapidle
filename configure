@@ -28,8 +28,8 @@
 set -e
 
 PROJECT="mbimapidle"
-VERSION="0.93"
-RELEASE="1"
+VERSION="0.94"
+RELEASE="0"
 
 if test "$RELEASE" -eq 0; then
 	GIT_REV=$(git describe --abbrev=7 --dirty --always)
@@ -50,6 +50,10 @@ WARN="${WARN} -Wstrict-prototypes -Wredundant-decls -Woverlength-strings -Wnull-
 WARN="${WARN} -Wnested-externs -Wdate-time -Walloc-zero -Wduplicated-branches -Wduplicated-cond"
 WARN="${WARN} -Wdisabled-optimization -Wjump-misses-init -Wconversion"
 
+# additional flags
+ADDON="-flto -fuse-linker-plugin -D_FORTIFY_SOURCE=2 -fpie"
+LINKER_FLAGS="-Wl,-pie"
+
 REQUIRE_HEADERS="ctype.h limits.h libgen.h netdb.h fcntl.h unistd.h errno.h"
 REQUIRE_HEADERS="${REQUIRE_HEADERS} syslog.h sys/socket.h arpa/inet.h netinet/in.h sys/queue.h"
 REQUIRE_HEADERS="${REQUIRE_HEADERS} sys/select.h sys/ioctl.h sys/stat.h sys/wait.h getopt.h"
@@ -60,7 +64,7 @@ REQUIRE_DEFINES=""
 OPTIONAL_DEFINES=""
 
 CFLAGS="${CFLAGS} -DVERSION='\"${VERSION}\"' -DPROG='\"${PROJECT}\"' -Wall -Wextra"
-LIBS="${LIBS}"
+LIBS="${LIBS} -Wl,-pie"
 
 CMAIN="int main(int argc, char **argv) {return 0;}"
 
@@ -75,7 +79,7 @@ check_c_compiler()
 	fi
 }
 
-check_c_warn()
+check_cc_common()
 {
 	echo -n "checking if '${CC}' accepts ${1}... "
 	echo "${CMAIN}" | ${CC} ${1} -o /dev/null -xc - >.cc-check-$1 2>&1
@@ -83,9 +87,31 @@ check_c_warn()
 	rm .cc-check-${1}
 	if ! test -n "$err"; then
 		echo "yes"
-		CFLAGS="$CFLAGS $1"
+		return 0
 	else
 		echo "no"
+		return 1
+	fi
+}
+
+check_c_warn()
+{
+	if check_cc_common $1; then
+		CFLAGS="$CFLAGS $1"
+	fi
+}
+
+check_additional_c_flag()
+{
+	if check_cc_common $1; then
+		ADDON_FLAGS="$ADDON_FLAGS $1"
+	fi
+}
+
+check_linker_flag()
+{
+	if check_cc_common $1; then
+		LIBS="$LIBS $1"
 	fi
 }
 
@@ -128,6 +154,8 @@ check_header()
 		have=$(echo $have | tr ./ _)
 		have="HAVE_${have}"
 		echo "found ${have}"
+		printf "\n/* Define to 1 if $1 is found */\n" >> config.h
+		printf "#define ${have} 1\n" >> config.h
 	else
 		echo "not found"
 		if test $2 -eq 1; then
@@ -241,6 +269,14 @@ check_c_compiler
 for w in $WARN; do
 	check_c_warn $w
 done
+
+for f in $ADDON; do
+	check_additional_c_flag $f
+done
+for l in $LINKER_FLAGS; do
+	check_linker_flag $l
+done
+
 check_pkgconfig
 
 pkgconfig_check libssl 1
@@ -283,7 +319,8 @@ if test -n "$opt_debug"; then
 	CFLAGS="$CFLAGS -g -ggdb -Og"
 	debug=$opt_debug
 else
-	CFLAGS="$CFLAGS -O1"
+	CFLAGS="$CFLAGS -O2 $ADDON_FLAGS"
+	LIBS="$LIBS $ADDON_FLAGS"
 fi
 
 if test -n "$opt_openrc"; then
