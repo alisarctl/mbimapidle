@@ -819,7 +819,7 @@ static bool mbox_query_caps(struct mbox *m)
 	return ret;
 }
 
-void mbox_idle_proc(struct mbox *m)
+void mbox_proc(struct mbox *m)
 {
 	if (m->state == MBOX_DISABLED)
 		return;

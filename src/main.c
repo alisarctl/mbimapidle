@@ -100,8 +100,38 @@ static void sig_handler(int signum)
 		main_loop_running = 0;
 }
 
+static void mbox_proc_idle(struct mbox*m)
+{
+	ssize_t nbytes = 0;
+
+	if (m->state == MBOX_DISABLED)
+		return;
+
+	if (m->state == MBOX_IDLE) {
+		int ret;
+
+		ret = ioctl(m->sock, FIONREAD, &nbytes);
+		if (ret == -1) {
+			/**
+			 * Log error and process this mbox below
+			 * with mbox_proc to reset the connection
+			 **/
+			mlog(LOG_ERR, "'%s' ioctl failed : %s\n",
+			m->name, strerror(errno));
+		} else {
+			/**
+			 * We are idle and we have nothing to read
+			 * so skip this mbox
+			 **/
+			if (nbytes == 0)
+				return;
+		}
+	}
+	mbox_proc(m);
+}
+
 #define MAX_PASS_TOKEN_LEN 8192
-static void mbox_proc(struct mbox*m)
+static void mbox_proc_cmd(struct mbox*m)
 {
 	if (m->state == MBOX_DISABLED)
 		return;
@@ -191,9 +221,7 @@ out:
 			close(m->pass_pipe_fd);
 			m->pass_pipe_fd = 0;
 		}
-
 	}
-	mbox_idle_proc(m);
 }
 
 static void mbox_check_state (struct mbox *m)
@@ -318,8 +346,11 @@ int main(int argc, char *argv[])
 			reload_all = false;
 		}
 
+		/* Process commands if any */
+		mbox_foreach(&mbox_proc_cmd);
+
 		/* Process messages/connections/etc.*/
-		mbox_foreach(&mbox_proc);
+		mbox_foreach(&mbox_proc_idle);
 
 		/* Check mbox state */
 		mbox_foreach(&mbox_check_state);
