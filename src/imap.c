@@ -942,12 +942,10 @@ void mbox_proc(struct mbox *m)
 					imap_decode64(m);
 					mlog(LOG_DEBUG, "'%s' AUTH FAILED '%s'\n", m->name, m->buf);
 					mbox_send_empty(m);
-					RESET_BUFFER(m);
-					m->state = MBOX_DISABLED;
+					handle_failure(m);
 				} else {
 					mlog(LOG_DEBUG,"'%s' login failed\n", m->name);
-					RESET_BUFFER(m);
-					m->state = MBOX_DISABLED;
+					handle_failure(m);
 				}
 			}
 			break;
