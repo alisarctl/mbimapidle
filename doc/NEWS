@@ -1,3 +1,9 @@
+0.94 (2026-05-13)
+=================
+- optimize IDLE handling to save cpu time
+- Retry connection on AUTH/LOGIN FAILURE
+- Update configure and fix compiler flags
+
 0.93 (2026-04-23)
 =================
 - Allow command in user home directory
